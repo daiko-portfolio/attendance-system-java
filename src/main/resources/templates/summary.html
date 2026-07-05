@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>出欠時間分析</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" th:href="@{/style.css}">
+</head>
+
+<body>
+
+<header class="site-header">
+    <a class="nav-link nav-home" href="/">メニュー</a>
+    <a class="nav-link nav-create" href="/register">出欠登録</a>
+    <a class="nav-link nav-view" href="/list">出欠一覧</a>
+    <a class="nav-link nav-view" href="/monthly">月次表</a>
+    <a class="nav-link nav-view" href="/summary">出席率</a>
+    <a class="nav-link nav-update" href="/edit">出欠編集</a>
+    <a class="nav-link nav-create" href="/class/create">新教室作成</a>
+    <a class="nav-link nav-update" href="/classes">教室管理</a>
+    <a class="nav-link nav-update" href="/persons">生徒管理</a>
+</header>
+
+<main>
+
+<h1>出欠時間分析</h1>
+
+<form action="/summary" method="get">
+    教室：
+    <select name="class_id" required>
+        <option value="">選択してください</option>
+        <option
+            th:each="classItem : ${classes}"
+            th:value="${classItem.classId}"
+            th:text="${classItem.className}"
+            th:selected="${selectedClassId != null and selectedClassId == classItem.classId.toString()}"
+        ></option>
+    </select>
+
+    開始日：
+    <input type="date" name="start_date" th:value="${startDate}">
+
+    終了日：
+    <input type="date" name="end_date" th:value="${endDate}">
+
+    <button type="submit" class="btn btn-search">表示</button>
+</form>
+
+<br>
+
+<table th:if="${!rows.isEmpty()}">
+    <tr>
+        <th>出席番号</th>
+        <th>名前</th>
+        <th>総合</th>
+        <th>学科</th>
+        <th>実技</th>
+        <th>判定</th>
+    </tr>
+
+    <tr th:each="row : ${rows}">
+        <td th:text="${row.attendanceNo}"></td>
+        <td th:text="${row.name}"></td>
+
+        <td>
+            出席：<span th:text="${row.totalAttended}"></span>h<br>
+            欠席：<span th:text="${row.totalAbsent}"></span>h<br>
+            最大：<span th:text="${row.totalMax}"></span>h<br>
+            率：<span th:text="${row.totalRate}"></span>%
+        </td>
+
+        <td>
+            出席：<span th:text="${row.academicAttended}"></span>h<br>
+            欠席：<span th:text="${row.academicAbsent}"></span>h<br>
+            最大：<span th:text="${row.academicMax}"></span>h<br>
+            率：<span th:text="${row.academicRate}"></span>%
+        </td>
+
+        <td>
+            出席：<span th:text="${row.practicalAttended}"></span>h<br>
+            欠席：<span th:text="${row.practicalAbsent}"></span>h<br>
+            最大：<span th:text="${row.practicalMax}"></span>h<br>
+            率：<span th:text="${row.practicalRate}"></span>%
+        </td>
+
+        <td class="judge-cell">
+            <div th:class="'judge-line ' + (${row.totalJudge == '安全'} ? 'judge-safe' : (${row.totalJudge == '注意'} ? 'judge-warning' : 'judge-danger'))">
+                総合：<span th:text="${row.totalJudge}"></span>
+            </div>
+
+            <div th:class="'judge-line ' + (${row.academicJudge == '安全'} ? 'judge-safe' : (${row.academicJudge == '注意'} ? 'judge-warning' : 'judge-danger'))">
+                学科：<span th:text="${row.academicJudge}"></span>
+            </div>
+
+            <div th:class="'judge-line ' + (${row.practicalJudge == '安全'} ? 'judge-safe' : (${row.practicalJudge == '注意'} ? 'judge-warning' : 'judge-danger'))">
+                実技：<span th:text="${row.practicalJudge}"></span>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<p th:if="${rows.isEmpty() and selectedClassId != null and !selectedClassId.isBlank()}">
+    この条件の出欠データはありません。
+</p>
+
+</main>
+
+</body>
+
+</html>

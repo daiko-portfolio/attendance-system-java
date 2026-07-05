@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>月次出欠表</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" th:href="@{/style.css}">
+</head>
+
+<body>
+
+<header class="site-header">
+    <a class="nav-link nav-home" href="/">メニュー</a>
+    <a class="nav-link nav-create" href="/register">出欠登録</a>
+    <a class="nav-link nav-view" href="/list">出欠一覧</a>
+    <a class="nav-link nav-view" href="/monthly">月次表</a>
+    <a class="nav-link nav-view" href="/summary">出席率</a>
+    <a class="nav-link nav-update" href="/edit">出欠編集</a>
+    <a class="nav-link nav-create" href="/class/create">新教室作成</a>
+    <a class="nav-link nav-update" href="/classes">教室管理</a>
+    <a class="nav-link nav-update" href="/persons">生徒管理</a>
+</header>
+
+<main>
+
+<h1>月次出欠表</h1>
+
+<form action="/monthly" method="get">
+
+    教室：
+    <select name="class_id" required>
+        <option value="">選択してください</option>
+        <option
+            th:each="classItem : ${classes}"
+            th:value="${classItem.classId}"
+            th:text="${classItem.className}"
+            th:selected="${selectedClassId != null and selectedClassId == classItem.classId.toString()}"
+        ></option>
+    </select>
+
+    月：
+    <input type="month" name="month" th:value="${selectedMonth}" required>
+
+    <button type="submit" class="btn btn-search">表示</button>
+
+</form>
+
+<br>
+
+<div th:if="${!monthlyRows.isEmpty()}">
+
+<div class="summary-box">
+    <h2>月次サマリー</h2>
+
+    <div class="summary-grid">
+        <div class="summary-card">
+            <h3>総合</h3>
+            授業時間：<span th:text="${monthSummary.totalMax}"></span>h<br>
+            授業日数：<span th:text="${monthSummary.totalDays}"></span>日<span th:text="${monthSummary.totalRestHours}"></span>h
+        </div>
+
+        <div class="summary-card">
+            <h3>学科</h3>
+            授業時間：<span th:text="${monthSummary.academicMax}"></span>h<br>
+            授業日数：<span th:text="${monthSummary.academicDays}"></span>日<span th:text="${monthSummary.academicRestHours}"></span>h
+        </div>
+
+        <div class="summary-card">
+            <h3>実技</h3>
+            授業時間：<span th:text="${monthSummary.practicalMax}"></span>h<br>
+            授業日数：<span th:text="${monthSummary.practicalDays}"></span>日<span th:text="${monthSummary.practicalRestHours}"></span>h
+        </div>
+    </div>
+</div>
+
+<br>
+
+<div class="table-scroll">
+
+<table>
+    <tr>
+        <th>出席番号</th>
+        <th>名前</th>
+
+        <th th:each="slot : ${slots}">
+            <span th:text="${slot.dateLabel}"></span><br>
+            <span th:text="${slot.checkLabel}"></span>
+        </th>
+
+        <th>総合</th>
+        <th>学科</th>
+        <th>実技</th>
+    </tr>
+
+    <tr th:each="row : ${monthlyRows}">
+        <td th:text="${row.attendanceNo}"></td>
+        <td th:text="${row.name}"></td>
+
+        <td
+            th:each="cell : ${row.cells}"
+            th:class="${cell.attendedHours == 3} ? 'status-present' : (${cell.attendedHours == 0} ? 'status-absent' : ((${cell.attendedHours == 1} or ${cell.attendedHours == 2}) ? 'status-warning' : 'status-none'))"
+        >
+            <span th:if="${cell.attendedHours != null}">
+                <span th:text="${cell.lessonType}"></span><br>
+                <span th:text="${cell.attendedHours} + 'h'"></span>
+            </span>
+            <span th:unless="${cell.attendedHours != null}">未登録</span>
+        </td>
+
+        <td>
+            出席：<span th:text="${row.totalAttended}"></span>h<br>
+            欠席：<span th:text="${row.totalAbsent}"></span>h<br>
+            最大：<span th:text="${row.totalMax}"></span>h<br>
+            換算：<span th:text="${row.totalDays}"></span>日<span th:text="${row.totalRestHours}"></span>h
+        </td>
+
+        <td>
+            出席：<span th:text="${row.academicAttended}"></span>h<br>
+            欠席：<span th:text="${row.academicAbsent}"></span>h<br>
+            最大：<span th:text="${row.academicMax}"></span>h
+        </td>
+
+        <td>
+            出席：<span th:text="${row.practicalAttended}"></span>h<br>
+            欠席：<span th:text="${row.practicalAbsent}"></span>h<br>
+            最大：<span th:text="${row.practicalMax}"></span>h
+        </td>
+    </tr>
+
+</table>
+
+</div>
+
+</div>
+
+<p th:if="${monthlyRows.isEmpty() and selectedClassId != null and !selectedClassId.isBlank()}">
+    この条件の出欠データはありません。
+</p>
+
+</main>
+
+</body>
+
+</html>
