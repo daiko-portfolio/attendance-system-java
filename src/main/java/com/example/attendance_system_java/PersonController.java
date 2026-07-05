@@ -1,0 +1,155 @@
+package com.example.attendance_system_java;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+@Controller
+public class PersonController {
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public PersonController(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public record ClassOption(long classId, String className) {}
+
+    public record PersonRow(
+            long personId,
+            String className,
+            int attendanceNo,
+            String name,
+            boolean isActive
+    ) {}
+
+    @GetMapping("/persons")
+    public String persons(
+            @RequestParam(name = "class_id", required = false) String selectedClassId,
+            @RequestParam(name = "name", required = false) String searchName,
+            Model model
+    ) {
+        List<ClassOption> classes = jdbcTemplate.query(
+                "SELECT class_id, class_name FROM classes ORDER BY class_id",
+                (rs, rowNum) -> new ClassOption(rs.getLong("class_id"), rs.getString("class_name"))
+        );
+
+        StringBuilder sql = new StringBuilder("""
+                SELECT
+                    p.person_id,
+                    c.class_name,
+                    p.attendance_no,
+                    p.name,
+                    p.is_active
+                FROM persons p
+                JOIN classes c ON p.class_id = c.class_id
+                WHERE 1 = 1
+                """);
+
+        List<Object> params = new ArrayList<>();
+
+        if (selectedClassId != null && !selectedClassId.isBlank()) {
+            sql.append(" AND p.class_id = ?");
+            params.add(selectedClassId);
+        }
+
+        if (searchName != null && !searchName.isBlank()) {
+            sql.append(" AND p.name LIKE ?");
+            params.add("%" + searchName + "%");
+        }
+
+        sql.append(" ORDER BY c.class_id, p.attendance_no");
+
+        List<PersonRow> rows = jdbcTemplate.query(
+                sql.toString(),
+                (rs, rowNum) -> new PersonRow(
+                        rs.getLong("person_id"),
+                        rs.getString("class_name"),
+                        rs.getInt("attendance_no"),
+                        rs.getString("name"),
+                        rs.getInt("is_active") != 0
+                ),
+                params.toArray()
+        );
+
+        int nextAttendanceNo = 1;
+
+        if (selectedClassId != null && !selectedClassId.isBlank()) {
+            Integer next = jdbcTemplate.queryForObject(
+                    "SELECT COALESCE(MAX(attendance_no), 0) + 1 FROM persons WHERE class_id = ?",
+                    Integer.class,
+                    selectedClassId
+            );
+            nextAttendanceNo = next;
+        }
+
+        model.addAttribute("classes", classes);
+        model.addAttribute("rows", rows);
+        model.addAttribute("selectedClassId", selectedClassId);
+        model.addAttribute("searchName", searchName);
+        model.addAttribute("nextAttendanceNo", nextAttendanceNo);
+
+        return "persons";
+    }
+
+    @PostMapping("/persons/create")
+    public String personsCreate(
+            @RequestParam("class_id") String classId,
+            @RequestParam("attendance_no") String attendanceNo,
+            @RequestParam("name") String name,
+            RedirectAttributes redirectAttributes
+    ) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO persons (attendance_no, name, class_id, is_active)
+                VALUES (?, ?, ?, 1)
+                """,
+                attendanceNo, name, classId
+        );
+
+        redirectAttributes.addAttribute("class_id", classId);
+        return "redirect:/persons";
+    }
+
+    @PostMapping("/persons/update")
+    public String personsUpdate(
+            @RequestParam Map<String, String> allParams,
+            RedirectAttributes redirectAttributes
+    ) {
+        String selectedClassId = allParams.get("selected_class_id");
+        String searchName = allParams.get("search_name");
+
+        for (Map.Entry<String, String> entry : allParams.entrySet()) {
+            String key = entry.getKey();
+
+            if (key.startsWith("person_id_")) {
+                String personId = key.substring("person_id_".length());
+
+                String attendanceNo = allParams.get("attendance_no_" + personId);
+                String name = allParams.get("name_" + personId);
+                int isActive = allParams.containsKey("is_active_" + personId) ? 1 : 0;
+
+                jdbcTemplate.update(
+                        """
+                        UPDATE persons
+                        SET attendance_no = ?, name = ?, is_active = ?
+                        WHERE person_id = ?
+                        """,
+                        attendanceNo, name, isActive, personId
+                );
+            }
+        }
+
+        redirectAttributes.addAttribute("class_id", selectedClassId);
+        redirectAttributes.addAttribute("name", searchName);
+        return "redirect:/persons";
+    }
+}

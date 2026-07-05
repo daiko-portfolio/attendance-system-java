@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>生徒管理</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" th:href="@{/style.css}">
+</head>
+
+<body>
+
+<header class="site-header">
+    <a class="nav-link nav-home" href="/">メニュー</a>
+    <a class="nav-link nav-create" href="/register">出欠登録</a>
+    <a class="nav-link nav-view" href="/list">出欠一覧</a>
+    <a class="nav-link nav-view" href="/monthly">月次表</a>
+    <a class="nav-link nav-view" href="/summary">出席率</a>
+    <a class="nav-link nav-update" href="/edit">出欠編集</a>
+    <a class="nav-link nav-create" href="/class/create">新教室作成</a>
+    <a class="nav-link nav-update" href="/classes">教室管理</a>
+    <a class="nav-link nav-update" href="/persons">生徒管理</a>
+</header>
+
+<main>
+
+<h1>生徒管理</h1>
+
+<form action="/persons" method="get">
+
+    教室：
+    <select name="class_id">
+        <option value="">全教室</option>
+        <option
+            th:each="classItem : ${classes}"
+            th:value="${classItem.classId}"
+            th:text="${classItem.className}"
+            th:selected="${selectedClassId != null and selectedClassId == classItem.classId.toString()}"
+        ></option>
+    </select>
+
+    名前：
+    <input type="text" name="name" th:value="${searchName}">
+
+    <button type="submit" class="btn btn-search">検索</button>
+
+    <a href="/persons">全件表示</a>
+
+</form>
+
+<br>
+
+<form action="/persons/update" method="post">
+
+    <input type="hidden" name="selected_class_id" th:value="${selectedClassId}">
+    <input type="hidden" name="search_name" th:value="${searchName}">
+
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>教室</th>
+            <th>出席番号</th>
+            <th>名前</th>
+            <th>在籍</th>
+        </tr>
+
+        <tr th:each="row : ${rows}">
+            <td>
+                <span th:text="${row.personId}"></span>
+                <input type="hidden" th:name="${'person_id_' + row.personId}" th:value="${row.personId}">
+            </td>
+
+            <td th:text="${row.className}"></td>
+
+            <td>
+                <input type="number" th:name="${'attendance_no_' + row.personId}" th:value="${row.attendanceNo}">
+            </td>
+
+            <td>
+                <input type="text" th:name="${'name_' + row.personId}" th:value="${row.name}">
+            </td>
+
+            <td>
+                <input
+                    type="checkbox"
+                    th:name="${'is_active_' + row.personId}"
+                    th:checked="${row.isActive}"
+                >
+            </td>
+        </tr>
+    </table>
+
+    <br>
+
+    <button type="submit" class="btn btn-update">
+        一括更新
+    </button>
+
+</form>
+
+<h2>新規生徒追加</h2>
+
+<form action="/persons/create" method="post">
+
+    教室：
+    <select name="class_id" required>
+        <option value="">選択してください</option>
+        <option
+            th:each="classItem : ${classes}"
+            th:value="${classItem.classId}"
+            th:text="${classItem.className}"
+            th:selected="${selectedClassId != null and selectedClassId == classItem.classId.toString()}"
+        ></option>
+    </select>
+
+    出席番号：
+    <input
+        type="number"
+        name="attendance_no"
+        th:value="${nextAttendanceNo}"
+        required
+    >
+
+    名前：
+    <input type="text" name="name" lang="ja" required>
+
+    <button type="submit" class="btn btn-create">
+        生徒追加
+    </button>
+
+</form>
+
+<br>
+
+<a href="/">メニューへ戻る</a>
+
+</main>
+
+</body>
+
+</html>

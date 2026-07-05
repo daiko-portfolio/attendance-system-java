@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>新教室作成</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" th:href="@{/style.css}">
+</head>
+
+<body>
+
+<header class="site-header">
+    <a class="nav-link nav-home" href="/">メニュー</a>
+    <a class="nav-link nav-create" href="/register">出欠登録</a>
+    <a class="nav-link nav-view" href="/list">出欠一覧</a>
+    <a class="nav-link nav-view" href="/monthly">月次表</a>
+    <a class="nav-link nav-view" href="/summary">出席率</a>
+    <a class="nav-link nav-update" href="/edit">出欠編集</a>
+    <a class="nav-link nav-create" href="/class/create">新教室作成</a>
+    <a class="nav-link nav-update" href="/classes">教室管理</a>
+    <a class="nav-link nav-update" href="/persons">生徒管理</a>
+</header>
+
+<main>
+
+<h1>新教室作成</h1>
+
+<form action="/class/create/submit" method="post">
+
+    <p>
+        教室名：
+        <input type="text" name="class_name" required>
+    </p>
+
+    <p>
+        開始日：
+        <input type="date" name="start_date" required>
+    </p>
+
+    <p>
+        終了日：
+        <input type="date" name="end_date" required>
+    </p>
+
+    <h2>生徒一覧</h2>
+
+    <table>
+        <tr>
+            <th>出席番号</th>
+            <th>名前</th>
+        </tr>
+
+        <tr th:each="i : ${#numbers.sequence(1, 20)}">
+            <td th:text="${i}"></td>
+            <td>
+                <input type="text" th:name="${'name_' + i}">
+            </td>
+        </tr>
+    </table>
+
+    <br>
+
+    <button type="submit" class="btn btn-create">
+        教室と生徒を一括登録
+    </button>
+
+</form>
+
+<br>
+
+<a href="/">メニューへ戻る</a>
+
+</main>
+
+</body>
+
+</html>
