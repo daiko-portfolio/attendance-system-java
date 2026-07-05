@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>出欠登録</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" th:href="@{/style.css}">
+</head>
+
+<body>
+
+<header class="site-header">
+    <a class="nav-link nav-home" href="/">メニュー</a>
+    <a class="nav-link nav-create" href="/register">出欠登録</a>
+    <a class="nav-link nav-view" href="/list">出欠一覧</a>
+    <a class="nav-link nav-view" href="/monthly">月次表</a>
+    <a class="nav-link nav-view" href="/summary">出席率</a>
+    <a class="nav-link nav-update" href="/edit">出欠編集</a>
+    <a class="nav-link nav-create" href="/class/create">新教室作成</a>
+    <a class="nav-link nav-update" href="/classes">教室管理</a>
+    <a class="nav-link nav-update" href="/persons">生徒管理</a>
+</header>
+
+<main>
+
+<h1>出欠登録</h1>
+
+<form action="/register" method="get">
+    教室：
+    <select name="class_id" required>
+        <option value="">選択してください</option>
+        <option
+            th:each="classItem : ${classes}"
+            th:value="${classItem.classId}"
+            th:text="${classItem.className}"
+            th:selected="${selectedClassId != null and selectedClassId == classItem.classId.toString()}"
+        ></option>
+    </select>
+
+    <button type="submit" class="btn btn-search">表示</button>
+</form>
+
+<br>
+
+<form th:if="${!persons.isEmpty()}" action="/attendance/submit" method="post">
+
+    <input type="hidden" name="class_id" th:value="${selectedClassId}">
+
+    <p>
+        日付：
+        <input type="date" name="attendance_date" th:value="${today}" required>
+    </p>
+
+    <p>
+        区分：
+        <select name="check_no" required>
+            <option value="1">午前</option>
+            <option value="2">午後</option>
+        </select>
+    </p>
+
+    <p>
+        授業属性：
+        <select name="lesson_type" required>
+            <option value="学科">学科</option>
+            <option value="実技">実技</option>
+        </select>
+    </p>
+
+    <h2 th:text="${className}"></h2>
+
+    <table>
+        <tr>
+            <th>出席番号</th>
+            <th>名前</th>
+            <th>出席時間</th>
+        </tr>
+
+        <tr th:each="person : ${persons}">
+            <td th:text="${person.attendanceNo}"></td>
+            <td th:text="${person.name}"></td>
+
+            <td>
+                <label class="radio-btn radio-present">
+                    <input
+                        type="radio"
+                        th:name="${'attended_hours_' + person.personId}"
+                        value="3"
+                        checked
+                    >
+                    <span>全出席</span>
+                </label>
+
+                <label class="radio-btn radio-warning">
+                    <input
+                        type="radio"
+                        th:name="${'attended_hours_' + person.personId}"
+                        value="2"
+                    >
+                    <span>2h</span>
+                </label>
+
+                <label class="radio-btn radio-warning">
+                    <input
+                        type="radio"
+                        th:name="${'attended_hours_' + person.personId}"
+                        value="1"
+                    >
+                    <span>1h</span>
+                </label>
+
+                <label class="radio-btn radio-absent">
+                    <input
+                        type="radio"
+                        th:name="${'attended_hours_' + person.personId}"
+                        value="0"
+                    >
+                    <span>欠席</span>
+                </label>
+            </td>
+        </tr>
+    </table>
+
+    <br>
+
+    <button type="submit" class="btn btn-create">一括登録</button>
+
+</form>
+
+<br>
+
+<a href="/">メニューへ戻る</a>
+
+</main>
+
+</body>
+
+</html>

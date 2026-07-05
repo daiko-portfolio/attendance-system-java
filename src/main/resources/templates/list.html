@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>出欠一覧</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" th:href="@{/style.css}">
+</head>
+
+<body>
+
+<header class="site-header">
+    <a class="nav-link nav-home" href="/">メニュー</a>
+    <a class="nav-link nav-create" href="/register">出欠登録</a>
+    <a class="nav-link nav-view" href="/list">出欠一覧</a>
+    <a class="nav-link nav-view" href="/monthly">月次表</a>
+    <a class="nav-link nav-view" href="/summary">出席率</a>
+    <a class="nav-link nav-update" href="/edit">出欠編集</a>
+    <a class="nav-link nav-create" href="/class/create">新教室作成</a>
+    <a class="nav-link nav-update" href="/classes">教室管理</a>
+    <a class="nav-link nav-update" href="/persons">生徒管理</a>
+</header>
+
+<main>
+
+<h1>出欠一覧</h1>
+
+<form action="/list" method="get">
+    日付：
+    <input type="date" name="date" th:value="${searchDate}">
+
+    教室：
+    <select name="class_id">
+        <option value="">全教室</option>
+        <option
+            th:each="classItem : ${classes}"
+            th:value="${classItem.classId}"
+            th:text="${classItem.className}"
+            th:selected="${selectedClassId != null and selectedClassId == classItem.classId.toString()}"
+        ></option>
+    </select>
+
+    名前：
+    <input type="text" name="name" th:value="${searchName}">
+
+    <button type="submit" class="btn btn-search">検索</button>
+
+    <a
+        class="btn btn-create"
+        th:href="@{/list/csv(date=${searchDate}, class_id=${selectedClassId}, name=${searchName}, lesson_type=${selectedLessonType})}"
+        >
+        CSV出力
+    </a>
+
+    <a href="/list">全件表示</a>
+</form>
+
+<br>
+
+<table>
+    <tr>
+        <th>教室</th>
+        <th>出席番号</th>
+        <th>名前</th>
+        <th>日付</th>
+        <th>午前</th>
+        <th>午後</th>
+    </tr>
+
+    <tr th:each="row : ${rows}">
+        <td th:text="${row.className}"></td>
+        <td th:text="${row.attendanceNo}"></td>
+        <td th:text="${row.name}"></td>
+        <td th:text="${row.attendanceDate}"></td>
+
+        <!-- 午前 -->
+        <td th:class="${row.morningHours == 3} ? 'status-present' : (${row.morningHours == 0} ? 'status-absent' : (${row.morningHours != null} ? 'status-warning' : 'status-none'))">
+            <span th:if="${row.morningHours != null}">
+                <span th:text="${row.morningLessonType}"></span><br>
+                <span th:text="${row.morningHours} + 'h'"></span>
+            </span>
+            <span th:unless="${row.morningHours != null}">未登録</span>
+        </td>
+
+        <!-- 午後 -->
+        <td th:class="${row.afternoonHours == 3} ? 'status-present' : (${row.afternoonHours == 0} ? 'status-absent' : (${row.afternoonHours != null} ? 'status-warning' : 'status-none'))">
+            <span th:if="${row.afternoonHours != null}">
+                <span th:text="${row.afternoonLessonType}"></span><br>
+                <span th:text="${row.afternoonHours} + 'h'"></span>
+            </span>
+            <span th:unless="${row.afternoonHours != null}">未登録</span>
+        </td>
+
+    </tr>
+</table>
+
+</main>
+
+</body>
+
+</html>
