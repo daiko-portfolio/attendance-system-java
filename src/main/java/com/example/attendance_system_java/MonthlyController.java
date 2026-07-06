@@ -14,6 +14,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 
+/**
+ * 月次出欠表画面のController。全Controllerの中で最も処理が複雑な画面。
+ *
+ * ■ 全体の考え方
+ * DBの attendance テーブルは「生徒×日付×午前午後」で1行、という縦持ちのデータだが、
+ * 画面には「生徒を縦、日付×午前午後を横」に並べた表を出したい。
+ * そのため、DBから取得した行データを、いったんJavaのMap（辞書）に詰め替えてから、
+ * 「生徒でループ」「その中で日付×午前午後でループ」して該当データを探す、という
+ * 2段階の組み立てを行っている。
+ *
+ * ■ AttendanceKey / SlotKey について
+ * どちらも複数の値をまとめて1つの「キー」として扱うための入れ物（record）。
+ * recordは自動でequals()/hashCode()を実装してくれるため、
+ * 同じ値を持つ2つのAttendanceKeyは「同じキー」としてMapやSetで正しく扱われる
+ * （もし普通のクラスで作ると、この自動生成が無く別物として扱われてしまう）。
+ */
 @Controller
 public class MonthlyController {
 
@@ -35,8 +51,13 @@ public class MonthlyController {
             Integer attendedHours
     ) {}
 
+    // 「この生徒の、この日付・この午前午後のデータ」を一意に特定するためのキー
     private record AttendanceKey(long personId, String attendanceDate, int checkNo) {}
 
+    // 「この日付・この午前午後」という、表の列（1コマ分）を表すキー。
+    // Comparable<SlotKey>を実装しているのは、この後 TreeSet<SlotKey> に入れて
+    // 自動的に日付順・午前午後順に並び替えさせるため
+    // （TreeSetは追加した要素を、compareTo()の結果に従って常に並び替えて保持してくれる）
     private record SlotKey(String attendanceDate, int checkNo) implements Comparable<SlotKey> {
         @Override
         public int compareTo(SlotKey other) {
@@ -46,14 +67,18 @@ public class MonthlyController {
         }
     }
 
+    // 表の列見出し（例：「7/6」「AM」）を表示用に持つ入れ物
     public record Slot(String date, int checkNo, String dateLabel, String checkLabel) {}
 
+    // 月全体の集計値。合計を少しずつ足していく必要があるため、
+    // recordではなく、後から書き換え可能な普通のクラス（フィールドも public のまま）にしている
     public static class MonthSummary {
         public int totalMax = 0, totalDays = 0, totalRestHours = 0;
         public int academicMax = 0, academicDays = 0, academicRestHours = 0;
         public int practicalMax = 0, practicalDays = 0, practicalRestHours = 0;
     }
 
+    // 表の1マス分（ある生徒の、ある日付・午前午後のセル）の表示内容
     public record Cell(String lessonType, Integer attendedHours) {}
 
     public record MonthlyRow(
@@ -65,6 +90,12 @@ public class MonthlyController {
             int practicalAttended, int practicalAbsent, int practicalMax
     ) {}
 
+    /**
+     * 授業時間を「6時間=1日」換算した日数と余り時間に変換する（例：15h → 2日3h）。
+     * 戻り値は長さ2の配列 [日数, 余り時間] としている
+     * （Javaのメソッドは戻り値を1つしか返せないため、複数の値をまとめて返したい時に
+     *  こうした配列やrecordがよく使われる）。
+     */
     private static int[] convertHoursToDays(int hours) {
         return new int[] { hours / 6, hours % 6 };
     }
@@ -136,6 +167,11 @@ public class MonthlyController {
                     selectedClassId, firstDay.toString(), nextMonthStart.toString()
             );
 
+            // DBから取ってきた「1行=1生徒×1日×午前午後」のrecordsを、
+            // 探しやすい形（Map）に詰め替える。
+            //   attendanceMap : 「この生徒のこのコマ」→ そのデータ、を高速に引くため
+            //   slotSet       : 表の列を「日付の重複なし・順序どおり」に集めるため（TreeSetなので自動で整列される）
+            //   slotTypeMap   : 各コマの授業属性（学科/実技）を1回引くだけで済むように
             Map<AttendanceKey, AttendanceRecord> attendanceMap = new HashMap<>();
             TreeSet<SlotKey> slotSet = new TreeSet<>();
             Map<SlotKey, String> slotTypeMap = new HashMap<>();
@@ -149,6 +185,8 @@ public class MonthlyController {
                 slotTypeMap.put(slotKey, record.lessonType());
             }
 
+            // slotSetの中身（TreeSetなので日付・午前午後順に並んでいる）から、
+            // 表の列見出し用データ（Slot）を組み立てる
             for (SlotKey slotKey : slotSet) {
                 String dateLabel = Integer.parseInt(slotKey.attendanceDate().substring(5, 7))
                         + "/" + Integer.parseInt(slotKey.attendanceDate().substring(8, 10));
@@ -162,6 +200,10 @@ public class MonthlyController {
                 slots.add(new Slot(slotKey.attendanceDate(), slotKey.checkNo(), dateLabel, checkLabel));
             }
 
+            // 月全体の「最大授業時間」を集計する。
+            // ※全生徒の出席合計ではなく、「その月に登録されているコマの数」から
+            //  最大値（1コマ=3h）を出しているだけの点に注意
+            //  （欠席者がいても、コマ自体があれば3hとしてカウントされる）
             for (Slot slot : slots) {
                 String lessonType = slotTypeMap.get(new SlotKey(slot.date(), slot.checkNo()));
 

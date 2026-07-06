@@ -13,6 +13,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 出欠登録画面のController。
+ * 生徒1人1人につき "attended_hours_<person_id>" という名前のラジオボタンが
+ * 動的に並ぶ画面のため、POST側では @RequestParam Map<String, String> で
+ * フォームの中身をまるごと受け取り、名前のプレフィックス（前方一致）で
+ * 目的のパラメータだけを拾い出している。
+ */
 @Controller
 public class RegisterController {
 
@@ -49,7 +56,8 @@ public class RegisterController {
 
         List<PersonOption> persons = List.of();
         String className = null;
-        Map<Long, String> currentStatus = new HashMap<>();
+        // person_id -> 登録済みの出席時間（3/2/1/0）。ラジオボタンの初期選択に使う
+        Map<Long, Integer> currentHours = new HashMap<>();
 
         if (selectedClassId != null && !selectedClassId.isBlank()) {
 
@@ -72,16 +80,25 @@ public class RegisterController {
                 }
             }
 
+            // 選択日・区分で既に登録済みの出席時間を取得し、
+            // ラジオボタンの初期選択に使う（未登録の人はマップに入らない）
+            //
+            // ここのラムダ `rs -> { ... }` は、他の箇所で使っている
+            // RowMapper（1行を戻り値に変換してListにまとめる）とは別物で、
+            // RowCallbackHandlerという「1行ごとに好きな処理をするだけで、
+            // 戻り値を作らない」ためのインターフェース。
+            // 今回は戻り値のListが欲しいのではなく、currentHoursというMapに
+            // 直接詰め込みたいだけなのでこちらを使っている。
             String finalSelectedDate = selectedDate;
             jdbcTemplate.query(
                     """
-                    SELECT person_id, status
+                    SELECT person_id, attended_hours
                     FROM attendance
                     WHERE attendance_date = ?
                     AND check_no = ?
                     """,
                     rs -> {
-                        currentStatus.put(rs.getLong("person_id"), rs.getString("status"));
+                        currentHours.put(rs.getLong("person_id"), (Integer) rs.getObject("attended_hours"));
                     },
                     finalSelectedDate, selectedCheckNo
             );
@@ -94,7 +111,7 @@ public class RegisterController {
         model.addAttribute("today", selectedDate);
         model.addAttribute("selectedDate", selectedDate);
         model.addAttribute("selectedCheckNo", selectedCheckNo);
-        model.addAttribute("currentStatus", currentStatus);
+        model.addAttribute("currentHours", currentHours);
 
         return "register";
     }
@@ -109,6 +126,8 @@ public class RegisterController {
         String checkNo = allParams.get("check_no");
         String lessonType = allParams.get("lesson_type");
 
+        // ON CONFLICT ... DO UPDATE はSQLiteのUPSERT構文。
+        // 同じ日付・区分・生徒の組み合わせが既にあれば新規登録ではなく上書き更新にする。
         String sql = """
                 INSERT INTO attendance (
                     attendance_date, check_no, person_id, status, lesson_type, attended_hours
@@ -121,6 +140,8 @@ public class RegisterController {
                     attended_hours = excluded.attended_hours
                 """;
 
+        // フォームの全パラメータの中から "attended_hours_" で始まるものだけを拾い、
+        // 残りの文字列（person_id）を取り出して1人ずつ登録していく
         for (Map.Entry<String, String> entry : allParams.entrySet()) {
             String key = entry.getKey();
 

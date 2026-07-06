@@ -9,6 +9,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 出席率サマリー画面のController。
+ * SQL側でSUM/COUNTを使って集計まで済ませてから受け取り、
+ * Java側では「集計値を%や日数に変換するだけ」の役割分担にしている。
+ */
 @Controller
 public class SummaryController {
 
@@ -39,12 +44,14 @@ public class SummaryController {
             int practicalAttended, int practicalAbsent, int practicalMax, double practicalRate, String practicalJudge
     ) {}
 
+    // 出席率のしきい値判定：90%以上は安全、80%以上は注意、それ未満は危険
     private static String judge(double rate) {
         if (rate >= 90) return "安全";
         if (rate >= 80) return "注意";
         return "危険";
     }
 
+    // 小数点第1位で四捨五入する（例：66.66... → 66.7）
     private static double round1(double value) {
         return Math.round(value * 10) / 10.0;
     }
@@ -116,6 +123,8 @@ public class SummaryController {
                     params.toArray()
             );
 
+            // SQLで集計した「合計出席時間」「コマ数」から、
+            // 最大値（コマ数×3h）・欠席時間・出席率をJava側で計算する
             for (RawSummary r : results) {
                 int totalAttended = r.totalAttendedHours();
                 int totalMax = r.totalSlots() * 3;

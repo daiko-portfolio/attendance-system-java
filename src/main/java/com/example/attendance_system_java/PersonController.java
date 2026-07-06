@@ -12,6 +12,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 生徒管理画面のController。
+ * 一覧の一括更新は "person_id_<id>" のような動的なパラメータ名を使い、
+ * RegisterController/EditControllerと同じMap受け取りの仕組みを使っている。
+ */
 @Controller
 public class PersonController {
 
@@ -80,6 +85,9 @@ public class PersonController {
                 params.toArray()
         );
 
+        // 「新規生徒追加」フォームの出席番号欄に初期値として入れる番号。
+        // 選択中の教室の中で一番大きい出席番号+1を提案する（COALESCEは、
+        // まだ生徒が1人もいない教室でMAXがNULLになるのを防ぐための初期値0の指定）
         int nextAttendanceNo = 1;
 
         if (selectedClassId != null && !selectedClassId.isBlank()) {

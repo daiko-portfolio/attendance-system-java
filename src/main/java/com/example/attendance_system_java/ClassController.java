@@ -10,6 +10,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 教室（クラス）管理画面のController。
+ * 新教室作成は「教室情報」と「最大20人分の生徒情報」を1つのフォームで
+ * まとめて送信し、1回の処理で両方登録する作りになっている。
+ */
 @Controller
 public class ClassController {
 
@@ -46,8 +51,12 @@ public class ClassController {
                 className, startDate, endDate
         );
 
+        // last_insert_rowid() はSQLite独自の関数で、直前のINSERTで採番されたIDを取得できる。
+        // これで今作った教室のclass_idを、続けて登録する生徒たちの外部キーとして使える。
         Long classId = jdbcTemplate.queryForObject("SELECT last_insert_rowid()", Long.class);
 
+        // フォームには name_1 〜 name_20 という名前で最大20人分の入力欄が用意されている。
+        // 空欄の生徒は登録しない（何人入力されたかは事前に分からないため、決め打ちで20回試す）
         for (int i = 1; i <= 20; i++) {
             String studentName = allParams.get("name_" + i);
 
@@ -92,6 +101,10 @@ public class ClassController {
         String className = allParams.get("class_name");
         String startDate = allParams.get("start_date");
         String endDate = allParams.get("end_date");
+        // チェックボックスはHTMLの仕様上、チェックが外れているとそもそも
+        // フォームのパラメータに含まれない（"is_active"というキー自体が来ない）。
+        // そのため「値が0だったらチェック無し」ではなく、
+        // 「キーが存在するかどうか」で判定する必要がある。
         int isActive = allParams.containsKey("is_active") ? 1 : 0;
 
         jdbcTemplate.update(

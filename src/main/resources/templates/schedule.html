@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>授業スケジュール登録</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" th:href="@{/style.css}">
+    <style>
+        /* スケジュール表専用の最低限のスタイル */
+        .schedule-table select,
+        .schedule-table input[type="text"] {
+            display: block;
+            width: 100%;
+            margin: 2px 0;
+            box-sizing: border-box;
+        }
+        .schedule-table td {
+            vertical-align: top;
+            min-width: 130px;
+        }
+        /* 平日：午前=薄いブルーグレー、午後=薄いベージュ */
+        .row-am td {
+            background-color: #EAF2F8;
+        }
+        .row-pm td {
+            background-color: #FDF2E9;
+        }
+        /* 土日とも薄い紫（午前午後とも同色） */
+        .row-saturday td,
+        .row-sunday td {
+            background-color: #ECE3F7;
+        }
+        /* 重複セルは上記より優先して薄い赤にする */
+        .cell-conflict {
+            background-color: #ffd9d9 !important;
+        }
+        .error-box {
+            border: 1px solid #d9534f;
+            background-color: #fdecea;
+            color: #b52b27;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .success-box {
+            border: 1px solid #4cae4c;
+            background-color: #e9f7e9;
+            color: #2d7a2d;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+
+<body>
+
+<header class="site-header">
+    <a class="nav-link nav-home" href="/">メニュー</a>
+    <a class="nav-link nav-create" href="/register">出欠登録</a>
+    <a class="nav-link nav-view" href="/list">出欠一覧</a>
+    <a class="nav-link nav-view" href="/monthly">月次表</a>
+    <a class="nav-link nav-view" href="/summary">出席率</a>
+    <a class="nav-link nav-update" href="/edit">出欠編集</a>
+    <a class="nav-link nav-create" href="/schedule">スケジュール</a>
+    <a class="nav-link nav-create" href="/class/create">新教室作成</a>
+    <a class="nav-link nav-update" href="/classes">教室管理</a>
+    <a class="nav-link nav-update" href="/persons">生徒管理</a>
+</header>
+
+<main>
+
+<h1>授業スケジュール登録</h1>
+
+<!-- 週の選択 -->
+<form action="/schedule" method="get">
+    週：
+    <input type="week" name="week" th:value="${weekValue}" required>
+    <button type="submit" class="btn btn-search">表示</button>
+</form>
+
+<!-- 登録成功メッセージ（リダイレクト後に1回だけ表示される） -->
+<div class="success-box" th:if="${successMessage != null}" th:text="${successMessage}"></div>
+
+<!-- エラーメッセージ -->
+<div class="error-box" th:if="${!errorMessages.isEmpty()}">
+    <p>教師や教室の場所の重複、または選択されていない項目があるため、この週の内容は登録されていません。変更して再度登録を押してください。</p>
+    <ul>
+        <li th:each="msg : ${errorMessages}" th:text="${msg}"></li>
+    </ul>
+</div>
+
+<br>
+
+<!-- 週間スケジュール一括登録フォーム -->
+<form action="/schedule/submit" method="post">
+
+    <input type="hidden" name="week" th:value="${weekValue}">
+
+    <div class="table-scroll">
+    <table class="schedule-table">
+        <tr>
+            <th>日時</th>
+            <th th:each="cls : ${classes}" th:text="${cls.className}"></th>
+        </tr>
+
+        <tr th:each="row : ${rows}"
+            th:classappend="${row.weekend} ? (${row.dayIndex} == 5 ? 'row-saturday' : 'row-sunday') : (${row.checkNo} == 1 ? 'row-am' : 'row-pm')">
+
+            <td th:text="${row.label}"></td>
+
+            <td th:each="cls : ${classes}"
+                th:with="suffix=${cls.classId + '_' + row.dayIndex + '_' + row.checkNo}"
+                th:classappend="${conflictCells.contains(suffix)} ? 'cell-conflict'">
+
+                <!-- 状態（通常/休み） -->
+                <select th:name="${'status_' + suffix}">
+                    <option value="通常" th:selected="${formValues['status_' + suffix] == '通常'}">通常</option>
+                    <option value="休み" th:selected="${formValues['status_' + suffix] == '休み'}">休み</option>
+                </select>
+
+                <!-- 教師 -->
+                <select th:name="${'teacher_' + suffix}">
+                    <option value="">教師未定</option>
+                    <option
+                        th:each="t : ${teachers}"
+                        th:value="${t.teacherId}"
+                        th:text="${t.teacherName}"
+                        th:selected="${formValues['teacher_' + suffix] == (t.teacherId + '')}"
+                    ></option>
+                </select>
+
+                <!-- 場所 -->
+                <select th:name="${'room_' + suffix}">
+                    <option value="">場所未定</option>
+                    <option
+                        th:each="r : ${rooms}"
+                        th:value="${r.roomId}"
+                        th:text="${r.roomName}"
+                        th:selected="${formValues['room_' + suffix] == (r.roomId + '')}"
+                    ></option>
+                </select>
+
+                <!-- 授業属性 -->
+                <select th:name="${'lesson_' + suffix}">
+                    <option value="学科" th:selected="${formValues['lesson_' + suffix] == '学科'}">学科</option>
+                    <option value="実技" th:selected="${formValues['lesson_' + suffix] == '実技'}">実技</option>
+                </select>
+
+                <!-- コメント（テスト予定・休講理由など） -->
+                <input type="text" th:name="${'memo_' + suffix}"
+                       th:value="${formValues['memo_' + suffix]}"
+                       placeholder="コメント">
+
+            </td>
+        </tr>
+    </table>
+    </div>
+
+    <br>
+
+    <button type="submit" class="btn btn-create">この週を一括登録</button>
+
+</form>
+
+<br>
+
+<p>
+    ※「通常」で教師・場所とも未選択のコマは登録されません（未定のコマとして扱われます）。<br>
+    ※ 教師・場所の重複が1件でもあると、この週全体が登録されません。
+</p>
+
+<a href="/">メニューへ戻る</a>
+
+</main>
+
+</body>
+
+</html>

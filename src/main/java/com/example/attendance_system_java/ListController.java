@@ -10,6 +10,12 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 出欠一覧画面のController。
+ * このクラスのRowMapperは (rs, rowNum) -> new Xxx(...) というラムダ式で書いている。
+ * ScheduleRepositoryでは同じ役割を「名前付きクラス」で書いたが、
+ * やっていることは同じで、単に書き方（省略した書き方かどうか）が違うだけ。
+ */
 @Controller
 public class ListController {
 
@@ -54,6 +60,10 @@ public class ListController {
                 (rs, rowNum) -> new ClassOption(rs.getLong("class_id"), rs.getString("class_name"))
         );
 
+        // MAX(CASE WHEN ...) は、1人につき午前・午後で2行に分かれているattendanceテーブルの
+        // データを、person_id+日付ごとに1行（午前列・午後列）へまとめる（横持ちに変換する）ためのSQLの書き方。
+        // GROUP BYと組み合わせることで「午前の行にはmorning_hoursだけ値が入り、
+        // 午後の行の値はNULLになる」→ それをMAXでまとめると、結果的に片方の値だけが残る、という仕組み。
         StringBuilder sql = new StringBuilder("""
                 SELECT
                     c.class_name,

@@ -80,13 +80,13 @@
             <td th:text="${person.attendanceNo}"></td>
             <td th:text="${person.name}"></td>
 
-            <td>
+            <td th:with="hasData=${currentHours.containsKey(person.personId)}, curHours=${currentHours.get(person.personId)}">
                 <label class="radio-btn radio-present">
                     <input
                         type="radio"
                         th:name="${'attended_hours_' + person.personId}"
                         value="3"
-                        checked
+                        th:checked="${hasData} ? ${curHours == 3} : true"
                     >
                     <span>全出席</span>
                 </label>
@@ -96,6 +96,7 @@
                         type="radio"
                         th:name="${'attended_hours_' + person.personId}"
                         value="2"
+                        th:checked="${curHours == 2}"
                     >
                     <span>2h</span>
                 </label>
@@ -105,6 +106,7 @@
                         type="radio"
                         th:name="${'attended_hours_' + person.personId}"
                         value="1"
+                        th:checked="${curHours == 1}"
                     >
                     <span>1h</span>
                 </label>
@@ -114,6 +116,7 @@
                         type="radio"
                         th:name="${'attended_hours_' + person.personId}"
                         value="0"
+                        th:checked="${curHours == 0}"
                     >
                     <span>欠席</span>
                 </label>

@@ -12,6 +12,11 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 出欠編集・削除画面のController。
+ * RegisterControllerと同様、"attended_hours_<person_id>" という
+ * 動的な名前のパラメータをMapでまとめて受け取って処理する構成。
+ */
 @Controller
 public class EditController {
 
@@ -52,6 +57,8 @@ public class EditController {
         List<EditRow> rows = List.of();
         String currentLessonType = "学科";
 
+        // 日付・区分・教室の3つがすべて選ばれて初めて編集対象を検索する
+        // （どれか1つでも未選択なら、まだ検索条件が揃っていないので何も表示しない）
         if (searchDate != null && !searchDate.isBlank()
                 && checkNo != null && !checkNo.isBlank()
                 && selectedClassId != null && !selectedClassId.isBlank()) {
