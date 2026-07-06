@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>部屋管理</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" th:href="@{/style.css}">
+</head>
+
+<body>
+
+<div th:replace="~{fragments/header :: siteHeader}"></div>
+
+<main>
+
+<h1>部屋管理</h1>
+
+<table>
+    <tr>
+        <th>ID</th>
+        <th>部屋名</th>
+        <th>有効</th>
+        <th>更新</th>
+    </tr>
+
+    <tr th:each="room : ${rooms}">
+        <form action="/rooms/update" method="post">
+
+            <td>
+                <span th:text="${room.roomId}"></span>
+                <input type="hidden" name="room_id" th:value="${room.roomId}">
+            </td>
+
+            <td>
+                <input type="text" name="room_name" th:value="${room.roomName}">
+            </td>
+
+            <td>
+                <input type="checkbox" name="is_active" th:checked="${room.isActive}">
+            </td>
+
+            <td>
+                <button type="submit" class="btn btn-update">更新</button>
+            </td>
+
+        </form>
+    </tr>
+</table>
+
+<h2>新規部屋追加</h2>
+
+<form action="/rooms/create" method="post">
+    部屋名：
+    <input type="text" name="room_name" required>
+    <button type="submit" class="btn btn-create">部屋追加</button>
+</form>
+
+<br>
+
+<a href="/">メニューへ戻る</a>
+
+</main>
+
+</body>
+
+</html>

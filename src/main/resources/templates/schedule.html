@@ -53,18 +53,7 @@
 
 <body>
 
-<header class="site-header">
-    <a class="nav-link nav-home" href="/">メニュー</a>
-    <a class="nav-link nav-create" href="/register">出欠登録</a>
-    <a class="nav-link nav-view" href="/list">出欠一覧</a>
-    <a class="nav-link nav-view" href="/monthly">月次表</a>
-    <a class="nav-link nav-view" href="/summary">出席率</a>
-    <a class="nav-link nav-update" href="/edit">出欠編集</a>
-    <a class="nav-link nav-create" href="/schedule">スケジュール</a>
-    <a class="nav-link nav-create" href="/class/create">新教室作成</a>
-    <a class="nav-link nav-update" href="/classes">教室管理</a>
-    <a class="nav-link nav-update" href="/persons">生徒管理</a>
-</header>
+<div th:replace="~{fragments/header :: siteHeader}"></div>
 
 <main>
 

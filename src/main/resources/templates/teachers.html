@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>教師管理</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" th:href="@{/style.css}">
+</head>
+
+<body>
+
+<div th:replace="~{fragments/header :: siteHeader}"></div>
+
+<main>
+
+<h1>教師管理</h1>
+
+<table>
+    <tr>
+        <th>ID</th>
+        <th>教師名</th>
+        <th>有効</th>
+        <th>更新</th>
+    </tr>
+
+    <tr th:each="teacher : ${teachers}">
+        <form action="/teachers/update" method="post">
+
+            <td>
+                <span th:text="${teacher.teacherId}"></span>
+                <input type="hidden" name="teacher_id" th:value="${teacher.teacherId}">
+            </td>
+
+            <td>
+                <input type="text" name="teacher_name" th:value="${teacher.teacherName}">
+            </td>
+
+            <td>
+                <input type="checkbox" name="is_active" th:checked="${teacher.isActive}">
+            </td>
+
+            <td>
+                <button type="submit" class="btn btn-update">更新</button>
+            </td>
+
+        </form>
+    </tr>
+</table>
+
+<h2>新規教師追加</h2>
+
+<form action="/teachers/create" method="post">
+    教師名：
+    <input type="text" name="teacher_name" required>
+    <button type="submit" class="btn btn-create">教師追加</button>
+</form>
+
+<br>
+
+<a href="/">メニューへ戻る</a>
+
+</main>
+
+</body>
+
+</html>

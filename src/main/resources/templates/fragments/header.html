@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--
+  共通のヘッダーメニュー（全ページで使い回す部品）。
+  th:fragment="siteHeader" と名前を付けておくと、各ページから
+    <div th:replace="~{fragments/header :: siteHeader}"></div>
+  と書くだけでこの<header>まるごとが差し込まれる。
+  これでメニュー項目を増やす時、このファイル1つだけ直せば全ページに反映される。
+
+  site-header は style.css で flex-wrap: wrap にしているため、
+  リンクが増えると自動で折り返して2段になる。
+  途中の flex-basis:100% のdivは「ここで必ず改行させる」ための区切りで、
+  出欠系（1段目）とマスタ管理系（2段目）をきれいに分けている。
+-->
+<header class="site-header" th:fragment="siteHeader">
+    <a class="nav-link nav-home" href="/">メニュー</a>
+    <a class="nav-link nav-create" href="/register">出欠登録</a>
+    <a class="nav-link nav-view" href="/list">出欠一覧</a>
+    <a class="nav-link nav-view" href="/monthly">月次表</a>
+    <a class="nav-link nav-view" href="/summary">出席率</a>
+    <a class="nav-link nav-update" href="/edit">出欠編集</a>
+    <a class="nav-link nav-create" href="/schedule">スケジュール</a>
+
+    <div style="flex-basis: 100%; height: 0;"></div>
+
+    <a class="nav-link nav-create" href="/class/create">新教室作成</a>
+    <a class="nav-link nav-update" href="/classes">教室管理</a>
+    <a class="nav-link nav-update" href="/persons">生徒管理</a>
+    <a class="nav-link nav-update" href="/teachers">教師管理</a>
+    <a class="nav-link nav-update" href="/rooms">部屋管理</a>
+</header>
+
+</body>
+</html>
