@@ -5,7 +5,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -30,7 +29,7 @@ public class ListController {
             @RequestParam(name = "class_id", required = false) String selectedClassId,
             @RequestParam(name = "lesson_type", required = false, defaultValue = "") String selectedLessonType,
             Model model
-    ) throws SQLException {
+    ) {
         if (searchDate == null || searchDate.isBlank()) {
             searchDate = LocalDate.now().toString();
         }

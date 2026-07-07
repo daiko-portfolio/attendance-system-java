@@ -2,7 +2,6 @@ package com.example.attendance_system_java;
 
 import org.springframework.stereotype.Service;
 
-import java.sql.SQLException;
 import java.util.List;
 
 /**
@@ -36,7 +35,7 @@ public class RegisterService {
             String checkNo,
             String lessonType,
             List<PersonHours> entries
-    ) throws SQLException {
+    ) {
 
         for (PersonHours entry : entries) {
 

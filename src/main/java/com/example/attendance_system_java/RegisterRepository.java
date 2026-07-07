@@ -30,6 +30,14 @@ import java.util.Map;
  * try (Connection conn = ...; PreparedStatement stmt = ...; ResultSet rs = ...) { }
  * と書いておくと、tryブロックを抜ける瞬間（正常終了でも例外発生でも）に
  * 自動でclose()が呼ばれる。C#の using(...) { } と同じ役割。
+ *
+ * ■ SQLExceptionの扱いについて
+ * java.sql.SQLExceptionは「チェック例外」で、本来はメソッドに throws SQLException と
+ * 書いて呼び出し元に伝える必要がある。ただしこのプロジェクトのルールでは throws を使わず、
+ * ここでキャッチしてRuntimeException（実行時例外）に包んで投げ直している。
+ * こうすると、呼び出し元（Service/Controller）は throws を書かずに済む。
+ * DB接続エラーのような「起きたら普通は復旧しようがないエラー」なので、
+ * 呼び出し元に処理を強制せず、そのままアプリを止めてしまう扱いにしている。
  */
 @Repository
 public class RegisterRepository {
@@ -47,7 +55,7 @@ public class RegisterRepository {
     /**
      * 有効な教室一覧を取得する
      */
-    public List<ClassOption> findActiveClasses() throws SQLException {
+    public List<ClassOption> findActiveClasses() {
         String sql = """
                 SELECT class_id, class_name
                 FROM classes
@@ -66,6 +74,8 @@ public class RegisterRepository {
                 String className = rs.getString("class_name");
                 result.add(new ClassOption(classId, className));
             }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
 
         return result;
@@ -74,7 +84,7 @@ public class RegisterRepository {
     /**
      * 選択された教室の、有効な生徒一覧を出席番号順で取得する
      */
-    public List<PersonOption> findPersonsByClassId(String classId) throws SQLException {
+    public List<PersonOption> findPersonsByClassId(String classId) {
         String sql = """
                 SELECT person_id, attendance_no, name
                 FROM persons
@@ -99,6 +109,8 @@ public class RegisterRepository {
                     result.add(new PersonOption(personId, attendanceNo, name));
                 }
             }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
 
         return result;
@@ -108,7 +120,7 @@ public class RegisterRepository {
      * 指定日・区分で、既に登録済みの出席時間を person_id ごとに取得する。
      * 戻り値のMapに入っていない生徒は「まだ登録されていない」ことを意味する。
      */
-    public Map<Long, Integer> findCurrentHours(String attendanceDate, String checkNo) throws SQLException {
+    public Map<Long, Integer> findCurrentHours(String attendanceDate, String checkNo) {
         String sql = """
                 SELECT person_id, attended_hours
                 FROM attendance
@@ -131,6 +143,8 @@ public class RegisterRepository {
                     result.put(personId, attendedHours);
                 }
             }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
 
         return result;
@@ -147,7 +161,7 @@ public class RegisterRepository {
             String status,
             String lessonType,
             int attendedHours
-    ) throws SQLException {
+    ) {
         String sql = """
                 INSERT INTO attendance (
                     attendance_date, check_no, person_id, status, lesson_type, attended_hours
@@ -171,6 +185,8 @@ public class RegisterRepository {
             stmt.setInt(6, attendedHours);
 
             stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
     }
 }

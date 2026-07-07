@@ -14,6 +14,9 @@ import java.util.List;
  * 出欠一覧画面のDBアクセス層。生JDBCで書いている（RegisterRepositoryと同じ方針）。
  * この画面には「出席/欠席を判定する」のような業務判断が無く、
  * 検索条件を組み立ててSQLを実行するだけなので、Serviceは作らずController直結にしている。
+ *
+ * SQLException（チェック例外）はこのRepository内でキャッチしてRuntimeExceptionに変換し、
+ * 呼び出し元（Controller）にthrowsを伝播させない方針にしている。
  */
 @Repository
 public class ListRepository {
@@ -40,7 +43,7 @@ public class ListRepository {
     /**
      * 有効な教室一覧を取得する
      */
-    public List<ClassOption> findActiveClasses() throws SQLException {
+    public List<ClassOption> findActiveClasses() {
         String sql = """
                 SELECT class_id, class_name
                 FROM classes
@@ -59,6 +62,8 @@ public class ListRepository {
                 String className = rs.getString("class_name");
                 result.add(new ClassOption(classId, className));
             }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
 
         return result;
@@ -77,7 +82,7 @@ public class ListRepository {
             String searchDate,
             String selectedClassId,
             String searchName
-    ) throws SQLException {
+    ) {
 
         StringBuilder sql = new StringBuilder("""
                 SELECT
@@ -142,10 +147,20 @@ public class ListRepository {
                     // 生JDBCでNULLかどうかを調べるには、getInt()した直後にwasNull()を呼ぶ
                     // （C#のSqlDataReader.IsDBNull()に近い確認方法）。
                     int morningHoursValue = rs.getInt("morning_hours");
-                    Integer morningHours = rs.wasNull() ? null : morningHoursValue;
+                    Integer morningHours;
+                    if (rs.wasNull()) {
+                        morningHours = null;
+                    } else {
+                        morningHours = morningHoursValue;
+                    }
 
                     int afternoonHoursValue = rs.getInt("afternoon_hours");
-                    Integer afternoonHours = rs.wasNull() ? null : afternoonHoursValue;
+                    Integer afternoonHours;
+                    if (rs.wasNull()) {
+                        afternoonHours = null;
+                    } else {
+                        afternoonHours = afternoonHoursValue;
+                    }
 
                     result.add(new AttendanceRow(
                             className,
@@ -159,6 +174,8 @@ public class ListRepository {
                     ));
                 }
             }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
 
         return result;

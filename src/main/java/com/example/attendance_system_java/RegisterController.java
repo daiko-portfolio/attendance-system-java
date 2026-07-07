@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,11 +23,10 @@ import java.util.Map;
  * ・「出席時間から出席/欠席を判定して保存する」という業務ロジックは
  *   RegisterServiceに任せている。
  *
- * ここのメソッドは throws SQLException をそのまま書いている。
- * SQLExceptionは「チェック例外」と呼ばれる種類で、投げる可能性がある場合は
- * メソッドの宣言に throws を書く必要がある（C#の例外は書かなくてもいいので、この点はJava特有）。
- * 今回は独自の例外処理を作らず、そのままSpringに任せて素通しする方針にしている
- * （エラーが起きた場合はSpring Bootの標準エラー画面が表示される）。
+ * SQLException（チェック例外）はRegisterRepository側でキャッチしてRuntimeException（実行時例外）に
+ * 変換しているため、このControllerはthrowsを書かずに済んでいる。
+ * RuntimeExceptionは投げる場所を宣言する必要が無い例外の種類で、
+ * ここで何もしなくても、エラーが起きればSpring Bootの標準エラー画面が表示される。
  */
 @Controller
 public class RegisterController {
@@ -44,11 +43,27 @@ public class RegisterController {
     public String register(
             @RequestParam(name = "class_id", required = false) String selectedClassId,
             @RequestParam(name = "date", required = false) String selectedDate,
-            @RequestParam(name = "check_no", required = false, defaultValue = "1") String selectedCheckNo,
+            @RequestParam(name = "check_no", required = false) String selectedCheckNo,
+            @RequestParam(name = "lesson_type", required = false) String selectedLessonType,
             Model model
-    ) throws SQLException {
+    ) {
         if (selectedDate == null || selectedDate.isBlank()) {
             selectedDate = LocalDate.now().toString();
+        }
+
+        // 区分が指定されていなければ、今の時刻から午前/午後を自動判定する
+        // （正午より前なら午前、正午以降なら午後）
+        if (selectedCheckNo == null || selectedCheckNo.isBlank()) {
+            int currentHour = LocalTime.now().getHour();
+            if (currentHour < 12) {
+                selectedCheckNo = "1";
+            } else {
+                selectedCheckNo = "2";
+            }
+        }
+
+        if (selectedLessonType == null || selectedLessonType.isBlank()) {
+            selectedLessonType = "学科";
         }
 
         List<RegisterRepository.ClassOption> classes = registerRepository.findActiveClasses();
@@ -76,9 +91,9 @@ public class RegisterController {
         model.addAttribute("persons", persons);
         model.addAttribute("selectedClassId", selectedClassId);
         model.addAttribute("className", className);
-        model.addAttribute("today", selectedDate);
         model.addAttribute("selectedDate", selectedDate);
         model.addAttribute("selectedCheckNo", selectedCheckNo);
+        model.addAttribute("selectedLessonType", selectedLessonType);
         model.addAttribute("currentHours", currentHours);
 
         return "register";
@@ -93,7 +108,7 @@ public class RegisterController {
     public String submitAttendance(
             @RequestParam Map<String, String> allParams,
             RedirectAttributes redirectAttributes
-    ) throws SQLException {
+    ) {
         String classId = allParams.get("class_id");
         String attendanceDate = allParams.get("attendance_date");
         String checkNo = allParams.get("check_no");
