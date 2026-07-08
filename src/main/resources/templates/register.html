@@ -36,12 +36,6 @@
         <option value="2" th:selected="${selectedCheckNo == '2'}">午後</option>
     </select>
 
-    授業属性：
-    <select name="lesson_type" required>
-        <option value="学科" th:selected="${selectedLessonType == '学科'}">学科</option>
-        <option value="実技" th:selected="${selectedLessonType == '実技'}">実技</option>
-    </select>
-
     <button type="submit" class="btn btn-search">表示</button>
 </form>
 
@@ -52,12 +46,15 @@
     <input type="hidden" name="class_id" th:value="${selectedClassId}">
     <input type="hidden" name="attendance_date" th:value="${selectedDate}">
     <input type="hidden" name="check_no" th:value="${selectedCheckNo}">
-    <input type="hidden" name="lesson_type" th:value="${selectedLessonType}">
 
     <p>
         日付：<span th:text="${selectedDate}"></span>
         ／区分：<span th:text="${selectedCheckNo == '1'} ? '午前' : '午後'"></span>
-        ／授業属性：<span th:text="${selectedLessonType}"></span>
+        ／授業属性：
+        <select name="lesson_type" required>
+            <option value="学科" th:selected="${selectedLessonType == '学科'}">学科</option>
+            <option value="実技" th:selected="${selectedLessonType == '実技'}">実技</option>
+        </select>
     </p>
 
     <h2 th:text="${className}"></h2>

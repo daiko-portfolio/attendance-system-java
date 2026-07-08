@@ -85,6 +85,13 @@ public class RegisterController {
             }
 
             currentHours = registerRepository.findCurrentHours(selectedDate, selectedCheckNo);
+
+            // 既に登録済みなら、その授業属性を優先して表示する
+            // （ユーザーが選んだ値より、実際にDBへ登録済みの内容を優先する）
+            String registeredLessonType = registerRepository.findCurrentLessonType(selectedClassId, selectedDate, selectedCheckNo);
+            if (registeredLessonType != null && !registeredLessonType.isBlank()) {
+                selectedLessonType = registeredLessonType;
+            }
         }
 
         model.addAttribute("classes", classes);

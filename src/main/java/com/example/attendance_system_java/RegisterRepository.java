@@ -117,6 +117,44 @@ public class RegisterRepository {
     }
 
     /**
+     * 指定教室・日付・区分で、既に登録済みの授業属性（学科/実技）を取得する。
+     * 同じ日付・区分の出欠は同じ授業属性という前提（Edit画面と同じ考え方）で、
+     * 該当する行を1件だけ取得すれば十分なので LIMIT 1 を付けている。
+     * 該当データが無ければnullを返す。
+     */
+    public String findCurrentLessonType(String classId, String attendanceDate, String checkNo) {
+        String sql = """
+                SELECT a.lesson_type
+                FROM attendance a
+                JOIN persons p ON a.person_id = p.person_id
+                WHERE p.class_id = ?
+                AND a.attendance_date = ?
+                AND a.check_no = ?
+                LIMIT 1
+                """;
+
+        String result = null;
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, classId);
+            stmt.setString(2, attendanceDate);
+            stmt.setString(3, checkNo);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    result = rs.getString("lesson_type");
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        return result;
+    }
+
+    /**
      * 指定日・区分で、既に登録済みの出席時間を person_id ごとに取得する。
      * 戻り値のMapに入っていない生徒は「まだ登録されていない」ことを意味する。
      */
