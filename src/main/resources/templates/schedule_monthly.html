@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>スケジュール月次（教室別）</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" th:href="@{/style.css}">
+    <style>
+        /* カレンダー専用の最低限のスタイル */
+        .cal-table {
+            width: 100%;
+            table-layout: fixed;      /* 7列を均等幅にする */
+            border-collapse: collapse;
+        }
+        .cal-table th {
+            background-color: #2c3e50;
+            color: #fff;
+            padding: 8px;
+            font-size: 15px;
+        }
+        .cal-table td {
+            border: 1px solid #ccc;
+            vertical-align: top;
+            height: 100px;
+            padding: 6px;
+            font-size: 14px;
+        }
+        /* 前後の月のはみ出し日は薄く見せる */
+        .cal-out {
+            background-color: #fafafa;
+            color: #bbb;
+        }
+        /* 土日は薄い紫（登録画面と合わせている） */
+        .cal-weekend {
+            background-color: #f3eefb;
+        }
+        /* 今日のマスは枠を強調 */
+        .cal-today {
+            outline: 2px solid #2980b9;
+            outline-offset: -2px;
+        }
+        .cal-day-num {
+            font-weight: bold;
+            font-size: 15px;
+            margin-bottom: 3px;
+        }
+        .cal-slot {
+            margin-top: 2px;
+            line-height: 1.3;
+        }
+        .cal-am {
+            color: #1a5276;
+        }
+        .cal-pm {
+            color: #7d5a00;
+        }
+        .cal-holiday {
+            color: #999;
+        }
+        /* メモは1行固定。長い場合は「…」で省略し、マウスを乗せると全文が出る */
+        .cal-memo {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            color: #b9770e;
+        }
+    </style>
+</head>
+
+<body>
+
+<div th:replace="~{fragments/header :: siteHeader}"></div>
+
+<main>
+
+<h1>スケジュール月次（教室別）</h1>
+
+<!-- 教室と月の絞り込み -->
+<form action="/schedule/monthly" method="get">
+    教室：
+    <select name="class_id" required>
+        <option value="">選択してください</option>
+        <option
+            th:each="classItem : ${classes}"
+            th:value="${classItem.classId}"
+            th:text="${classItem.className}"
+            th:selected="${selectedClassId != null and selectedClassId == classItem.classId.toString()}"
+        ></option>
+    </select>
+
+    月：
+    <input type="month" name="month" th:value="${selectedMonth}" required>
+
+    <button type="submit" class="btn btn-search">表示</button>
+</form>
+
+<br>
+
+<!-- 教室が選ばれてカレンダーが組み立てられた時だけ表示 -->
+<div th:if="${weeks != null}">
+
+    <h2 th:text="${className}"></h2>
+
+    <table class="cal-table">
+        <tr>
+            <th>月</th>
+            <th>火</th>
+            <th>水</th>
+            <th>木</th>
+            <th>金</th>
+            <th>土</th>
+            <th>日</th>
+        </tr>
+
+        <tr th:each="week : ${weeks}">
+            <td th:each="day : ${week}"
+                th:classappend="(${day.inMonth} ? '' : 'cal-out ') + (${day.weekend} ? 'cal-weekend ' : '') + (${day.today} ? 'cal-today' : '')">
+
+                <div class="cal-day-num" th:text="${day.dayOfMonth}"></div>
+
+                <!-- 午前 -->
+                <div class="cal-slot cal-am" th:if="${day.am.registered}">
+                    <span th:if="${day.am.holiday}" class="cal-holiday">AM: 休み</span>
+                    <span th:unless="${day.am.holiday}"
+                          th:text="'AM: ' + ${day.am.teacherName} + '/' + ${day.am.roomName} + ' ' + ${day.am.lessonType}"></span>
+                    <div class="cal-memo"
+                         th:if="${day.am.memo != null and !day.am.memo.isEmpty()}"
+                         th:title="${day.am.memo}"
+                         th:text="'メモ: ' + ${day.am.memo}"></div>
+                </div>
+
+                <!-- 午後 -->
+                <div class="cal-slot cal-pm" th:if="${day.pm.registered}">
+                    <span th:if="${day.pm.holiday}" class="cal-holiday">PM: 休み</span>
+                    <span th:unless="${day.pm.holiday}"
+                          th:text="'PM: ' + ${day.pm.teacherName} + '/' + ${day.pm.roomName} + ' ' + ${day.pm.lessonType}"></span>
+                    <div class="cal-memo"
+                         th:if="${day.pm.memo != null and !day.pm.memo.isEmpty()}"
+                         th:title="${day.pm.memo}"
+                         th:text="'メモ: ' + ${day.pm.memo}"></div>
+                </div>
+
+            </td>
+        </tr>
+    </table>
+
+</div>
+
+<br>
+
+<a href="/">メニューへ戻る</a>
+
+</main>
+
+</body>
+
+</html>
