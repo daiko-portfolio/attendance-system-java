@@ -62,6 +62,7 @@ public class DatabaseInitializer implements CommandLineRunner {
         //   3. 同じ場所は同じ日・同じ区分に1クラスだけ
         // SQLiteのUNIQUEはNULL同士を別物として扱うため、
         // 休みの行（teacher_id/room_idがNULL）は何行あっても制約に掛からない
+        // check_noの3は「放課後」用（UIは未対応。将来の機能追加に備えてDB側だけ許可している）
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS schedules (
                     schedule_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,7 +77,7 @@ public class DatabaseInitializer implements CommandLineRunner {
                     UNIQUE(class_id, schedule_date, check_no),
                     UNIQUE(teacher_id, schedule_date, check_no),
                     UNIQUE(room_id, schedule_date, check_no),
-                    CHECK(check_no IN (1, 2)),
+                    CHECK(check_no IN (1, 2, 3)),
                     CHECK(status IN ('通常', '休み')),
                     CHECK(lesson_type IN ('学科', '実技') OR lesson_type IS NULL),
                     FOREIGN KEY(class_id) REFERENCES classes(class_id),

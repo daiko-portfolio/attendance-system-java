@@ -72,6 +72,8 @@ public class RegisterController {
         String className = null;
         // person_id -> 登録済みの出席時間（3/2/1/0）。ラジオボタンの初期選択に使う
         Map<Long, Integer> currentHours = new HashMap<>();
+        // その日の授業スケジュール（未登録ならnullのまま）
+        RegisterRepository.ScheduleInfo scheduleInfo = null;
 
         if (selectedClassId != null && !selectedClassId.isBlank()) {
 
@@ -86,11 +88,18 @@ public class RegisterController {
 
             currentHours = registerRepository.findCurrentHours(selectedDate, selectedCheckNo);
 
-            // 既に登録済みなら、その授業属性を優先して表示する
-            // （ユーザーが選んだ値より、実際にDBへ登録済みの内容を優先する）
+            // その教室・日付・区分の授業スケジュールを取得し、参考情報として画面に渡す
+            scheduleInfo = registerRepository.findScheduleInfo(selectedClassId, selectedDate, selectedCheckNo);
+
+            // 授業属性の初期値は、確度の高い順に決める
+            //   1. 出欠として登録済みの属性（実際に取った出欠が一番確実）
+            //   2. スケジュールに登録された属性（授業予定から引き継ぐ）
+            //   3. どちらも無ければ検索フォームの値（デフォルトは学科）のまま
             String registeredLessonType = registerRepository.findCurrentLessonType(selectedClassId, selectedDate, selectedCheckNo);
             if (registeredLessonType != null && !registeredLessonType.isBlank()) {
                 selectedLessonType = registeredLessonType;
+            } else if (scheduleInfo != null && scheduleInfo.lessonType() != null) {
+                selectedLessonType = scheduleInfo.lessonType();
             }
         }
 
@@ -102,6 +111,7 @@ public class RegisterController {
         model.addAttribute("selectedCheckNo", selectedCheckNo);
         model.addAttribute("selectedLessonType", selectedLessonType);
         model.addAttribute("currentHours", currentHours);
+        model.addAttribute("scheduleInfo", scheduleInfo);
 
         return "register";
     }

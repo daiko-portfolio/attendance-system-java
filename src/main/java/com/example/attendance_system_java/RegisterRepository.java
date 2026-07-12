@@ -53,6 +53,19 @@ public class RegisterRepository {
     public record PersonOption(long personId, int attendanceNo, String name) {}
 
     /**
+     * その教室・日付・区分に登録済みの授業スケジュール1コマ分。
+     * 出欠登録画面に「この日の授業予定」として参考表示するために使う。
+     * 「休み」として登録されている場合は teacherName / roomName / lessonType がnullになる。
+     */
+    public record ScheduleInfo(
+            String status,
+            String lessonType,
+            String teacherName,
+            String roomName,
+            String memo
+    ) {}
+
+    /**
      * 有効な教室一覧を取得する
      */
     public List<ClassOption> findActiveClasses() {
@@ -107,6 +120,55 @@ public class RegisterRepository {
                     int attendanceNo = rs.getInt("attendance_no");
                     String name = rs.getString("name");
                     result.add(new PersonOption(personId, attendanceNo, name));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        return result;
+    }
+
+    /**
+     * 指定教室・日付・区分の授業スケジュールを1件取得する。
+     * スケジュール未登録ならnullを返す。
+     * 教師名・場所名も一緒に表示したいので teachers / rooms をLEFT JOINしている
+     * （「休み」の行はteacher_id/room_idがNULLのため、INNER JOINだと行ごと消えてしまう）。
+     */
+    public ScheduleInfo findScheduleInfo(String classId, String attendanceDate, String checkNo) {
+        String sql = """
+                SELECT
+                    s.status,
+                    s.lesson_type,
+                    s.memo,
+                    t.teacher_name,
+                    r.room_name
+                FROM schedules s
+                LEFT JOIN teachers t ON s.teacher_id = t.teacher_id
+                LEFT JOIN rooms r ON s.room_id = r.room_id
+                WHERE s.class_id = ?
+                AND s.schedule_date = ?
+                AND s.check_no = ?
+                """;
+
+        ScheduleInfo result = null;
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, classId);
+            stmt.setString(2, attendanceDate);
+            stmt.setString(3, checkNo);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    String status = rs.getString("status");
+                    String lessonType = rs.getString("lesson_type");
+                    String memo = rs.getString("memo");
+                    String teacherName = rs.getString("teacher_name");
+                    String roomName = rs.getString("room_name");
+
+                    result = new ScheduleInfo(status, lessonType, teacherName, roomName, memo);
                 }
             }
         } catch (SQLException e) {
