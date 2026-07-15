@@ -1,6 +1,7 @@
 package com.example.attendance_system_java;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -8,6 +9,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +40,39 @@ public class EditController {
             Integer attendedHours
     ) {}
 
+    /**
+     * RowMapperは名前付きクラスで定義する（ラムダ式は使わない）。
+     * SQLExceptionはここでcatchしてRuntimeExceptionに変換し、throwsを外へ伝えない。
+     */
+    private static class ClassOptionMapper implements RowMapper<ClassOption> {
+        @Override
+        public ClassOption mapRow(ResultSet rs, int rowNum) {
+            try {
+                return new ClassOption(rs.getLong("class_id"), rs.getString("class_name"));
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private static class EditRowMapper implements RowMapper<EditRow> {
+        @Override
+        public EditRow mapRow(ResultSet rs, int rowNum) {
+            try {
+                return new EditRow(
+                        rs.getLong("person_id"),
+                        rs.getInt("attendance_no"),
+                        rs.getString("name"),
+                        rs.getString("status"),
+                        rs.getString("lesson_type"),
+                        (Integer) rs.getObject("attended_hours")
+                );
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
     @GetMapping("/edit")
     public String edit(
             @RequestParam(name = "date", required = false) String searchDate,
@@ -51,7 +87,7 @@ public class EditController {
                 WHERE is_active = 1
                 ORDER BY class_id
                 """,
-                (rs, rowNum) -> new ClassOption(rs.getLong("class_id"), rs.getString("class_name"))
+                new ClassOptionMapper()
         );
 
         List<EditRow> rows = List.of();
@@ -79,18 +115,15 @@ public class EditController {
                     AND p.class_id = ?
                     ORDER BY p.attendance_no
                     """,
-                    (rs, rowNum) -> new EditRow(
-                            rs.getLong("person_id"),
-                            rs.getInt("attendance_no"),
-                            rs.getString("name"),
-                            rs.getString("status"),
-                            rs.getString("lesson_type"),
-                            (Integer) rs.getObject("attended_hours")
-                    ),
+                    new EditRowMapper(),
                     searchDate, checkNo, selectedClassId
             );
 
-            currentLessonType = rows.isEmpty() ? "" : rows.get(0).lessonType();
+            if (rows.isEmpty()) {
+                currentLessonType = "";
+            } else {
+                currentLessonType = rows.get(0).lessonType();
+            }
         }
 
         model.addAttribute("classes", classes);
@@ -128,7 +161,13 @@ public class EditController {
             if (key.startsWith("attended_hours_")) {
                 String personId = key.substring("attended_hours_".length());
                 int attendedHours = Integer.parseInt(entry.getValue());
-                String status = attendedHours == 0 ? "欠席" : "出席";
+
+                String status;
+                if (attendedHours == 0) {
+                    status = "欠席";
+                } else {
+                    status = "出席";
+                }
 
                 jdbcTemplate.update(sql, status, lessonType, attendedHours, attendanceDate, checkNo, personId);
             }

@@ -1,41 +1,41 @@
 package com.example.attendance_system_java;
 
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * スケジュール機能のDBアクセス層。
+ * スケジュール機能のDBアクセス層。生JDBC（Connection/PreparedStatement/ResultSet）で書いている。
  * SQLはすべてここに集約する。Service層は業務判断だけを行う。
  *
- * ■ Spring Boot初心者向けメモ
- * ・@Repository は @Component の仲間で、「このクラスはDBアクセス専用ですよ」という
- *   目印。付けるとSpringが自動でBean化してくれるのは@Componentと同じ。
- *   さらに、DBアクセス時のエラーをSpring共通の例外に変換してくれる効果もある。
- * ・JdbcTemplate は、Spring BootがSQLiteなどのDBに対してSQLを実行するために
- *   用意している部品（Bean）。生のJDBC（java.sql.Connectionなど）を直接使うと
- *   接続の開始・終了処理を毎回自分で書く必要があるが、JdbcTemplateがそれを
- *   肩代わりしてくれる。Flaskで言う `sqlite3.connect()` + カーソル操作をまとめて
- *   簡単にしてくれるもの、とイメージすると分かりやすい。
+ * ■ C#（ADO.NET）との対応
+ *   SqlConnection   -> java.sql.Connection
+ *   SqlCommand      -> java.sql.PreparedStatement
+ *   SqlDataReader   -> java.sql.ResultSet
+ *   接続文字列      -> DataSource（Spring Bootが自動で用意するBean）
+ *
+ * SQLExceptionはこのRepository内でキャッチしてRuntimeExceptionに変換し、
+ * 呼び出し元（Service/Controller）にthrowsを伝播させない。
  */
 @Repository
 public class ScheduleRepository {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final DataSource dataSource;
 
-    public ScheduleRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public ScheduleRepository(DataSource dataSource) {
+        this.dataSource = dataSource;
     }
 
     // ---- データの入れ物 ----
     // record は「フィールドとgetterだけを持つ、変更不可のデータの入れ物」を
-    // 1行で定義できるJavaの機能。Pythonの dataclass(frozen=True) に近い。
-    // 例えば ClassInfo なら、自動で classId()/className()/defaultRoomId() という
-    // getterメソッドが使えるようになる（フィールド名()の形で呼び出す）。
+    // 1行で定義できるJavaの機能。例えば ClassInfo なら、自動で
+    // classId()/className()/defaultRoomId() というgetterメソッドが使えるようになる。
 
     public record ClassInfo(long classId, String className, Long defaultRoomId) {}
 
@@ -54,80 +54,8 @@ public class ScheduleRepository {
             String memo
     ) {}
 
-    // ---- RowMapper（ラムダ式を使わず名前付きクラスで定義）----
-    // RowMapperは「SQLの検索結果（ResultSet）の1行を、Javaのオブジェクト1個に変換する」
-    // ためのSpring標準インターフェース。他のController（ListControllerなど）では
-    //   (rs, rowNum) -> new Xxx(...)
-    // というラムダ式で簡潔に書いているが、ここでは読みやすさを優先して
-    // 「implements RowMapper<T>」という名前付きのクラスとして書いている。
-    // やっていることはラムダ式と全く同じで、mapRow()の中身がその行1件分の変換ロジック。
-
-    private static class ClassInfoMapper implements RowMapper<ClassInfo> {
-        @Override
-        public ClassInfo mapRow(ResultSet rs, int rowNum) throws SQLException {
-            // SQLiteドライバはINTEGER列の値をInteger/Long/nullのいずれかで返すことがあるため、
-            // getLong()で直接受けずにObjectとして受け取ってから型を確認して変換している。
-            // （default_room_idは空（NULL）の場合があるため、getLong()だと0扱いになってしまい困る）
-            Long defaultRoomId = null;
-            Object raw = rs.getObject("default_room_id");
-            if (raw instanceof Number) {
-                defaultRoomId = ((Number) raw).longValue();
-            }
-            return new ClassInfo(rs.getLong("class_id"), rs.getString("class_name"), defaultRoomId);
-        }
-    }
-
-    private static class TeacherMapper implements RowMapper<Teacher> {
-        @Override
-        public Teacher mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return new Teacher(rs.getLong("teacher_id"), rs.getString("teacher_name"));
-        }
-    }
-
-    private static class RoomMapper implements RowMapper<Room> {
-        @Override
-        public Room mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return new Room(rs.getLong("room_id"), rs.getString("room_name"));
-        }
-    }
-
-    private static class ScheduleRowMapper implements RowMapper<ScheduleRow> {
-        @Override
-        public ScheduleRow mapRow(ResultSet rs, int rowNum) throws SQLException {
-            // teacher_id / room_id は「休み」の行だとNULLになりうるので、
-            // ClassInfoMapperと同じ理由でObject経由で変換している
-            Long teacherId = null;
-            Object rawTeacher = rs.getObject("teacher_id");
-            if (rawTeacher instanceof Number) {
-                teacherId = ((Number) rawTeacher).longValue();
-            }
-
-            Long roomId = null;
-            Object rawRoom = rs.getObject("room_id");
-            if (rawRoom instanceof Number) {
-                roomId = ((Number) rawRoom).longValue();
-            }
-
-            return new ScheduleRow(
-                    rs.getLong("class_id"),
-                    rs.getString("schedule_date"),
-                    rs.getInt("check_no"),
-                    rs.getString("status"),
-                    rs.getString("lesson_type"),
-                    teacherId,
-                    roomId,
-                    rs.getString("memo")
-            );
-        }
-    }
-
     // ---- 取得系 ----
 
-    /**
-     * jdbcTemplate.query(sql, mapper) は、SQLを実行して結果を全件取得し、
-     * 各行に対してmapper.mapRow()を呼び出した結果をListにまとめて返す。
-     * SQLに ? のプレースホルダが無い（=パラメータが無い）場合はこの形で呼べる。
-     */
     public List<ClassInfo> findActiveClasses() {
         String sql = """
                 SELECT class_id, class_name, default_room_id
@@ -135,7 +63,33 @@ public class ScheduleRepository {
                 WHERE is_active = 1
                 ORDER BY class_id
                 """;
-        return jdbcTemplate.query(sql, new ClassInfoMapper());
+
+        List<ClassInfo> result = new ArrayList<>();
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                long classId = rs.getLong("class_id");
+                String className = rs.getString("class_name");
+
+                // SQLiteドライバはINTEGER列の値をInteger/Long/nullのいずれかで返すことがあるため、
+                // getLong()で直接受けずにObjectとして受け取ってから型を確認して変換している。
+                // （default_room_idは空（NULL）の場合があるため、getLong()だと0扱いになってしまい困る）
+                Long defaultRoomId = null;
+                Object raw = rs.getObject("default_room_id");
+                if (raw instanceof Number) {
+                    defaultRoomId = ((Number) raw).longValue();
+                }
+
+                result.add(new ClassInfo(classId, className, defaultRoomId));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        return result;
     }
 
     public List<Teacher> findActiveTeachers() {
@@ -145,7 +99,23 @@ public class ScheduleRepository {
                 WHERE is_active = 1
                 ORDER BY teacher_id
                 """;
-        return jdbcTemplate.query(sql, new TeacherMapper());
+
+        List<Teacher> result = new ArrayList<>();
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                long teacherId = rs.getLong("teacher_id");
+                String teacherName = rs.getString("teacher_name");
+                result.add(new Teacher(teacherId, teacherName));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        return result;
     }
 
     public List<Room> findActiveRooms() {
@@ -155,13 +125,27 @@ public class ScheduleRepository {
                 WHERE is_active = 1
                 ORDER BY room_id
                 """;
-        return jdbcTemplate.query(sql, new RoomMapper());
+
+        List<Room> result = new ArrayList<>();
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                long roomId = rs.getLong("room_id");
+                String roomName = rs.getString("room_name");
+                result.add(new Room(roomId, roomName));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        return result;
     }
 
     /**
      * 指定期間（開始日以上、終了日以下）のスケジュールを取得する。
-     * SQL文中の ? は、メソッドの第3引数以降（startDate, endDate）に
-     * 出現順で自動的に当てはめられる（SQLインジェクション対策にもなる書き方）。
      */
     public List<ScheduleRow> findSchedulesBetween(String startDate, String endDate) {
         String sql = """
@@ -170,7 +154,55 @@ public class ScheduleRepository {
                 WHERE schedule_date >= ?
                 AND schedule_date <= ?
                 """;
-        return jdbcTemplate.query(sql, new ScheduleRowMapper(), startDate, endDate);
+
+        List<ScheduleRow> result = new ArrayList<>();
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, startDate);
+            stmt.setString(2, endDate);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapScheduleRow(rs));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        return result;
+    }
+
+    /**
+     * ResultSetの1行をScheduleRowに変換する共通処理。
+     * teacher_id / room_id は「休み」の行だとNULLになりうるので、
+     * findActiveClasses()のdefault_room_idと同じ理由でObject経由で変換している。
+     */
+    private ScheduleRow mapScheduleRow(ResultSet rs) throws SQLException {
+        Long teacherId = null;
+        Object rawTeacher = rs.getObject("teacher_id");
+        if (rawTeacher instanceof Number) {
+            teacherId = ((Number) rawTeacher).longValue();
+        }
+
+        Long roomId = null;
+        Object rawRoom = rs.getObject("room_id");
+        if (rawRoom instanceof Number) {
+            roomId = ((Number) rawRoom).longValue();
+        }
+
+        return new ScheduleRow(
+                rs.getLong("class_id"),
+                rs.getString("schedule_date"),
+                rs.getInt("check_no"),
+                rs.getString("status"),
+                rs.getString("lesson_type"),
+                teacherId,
+                roomId,
+                rs.getString("memo")
+        );
     }
 
     // ---- 重複チェック系 ----
@@ -190,11 +222,24 @@ public class ScheduleRepository {
                 AND check_no = ?
                 AND class_id <> ?
                 """;
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, teacherId, scheduleDate, checkNo, excludeClassId);
-        if (count == null) {
-            return 0;
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setLong(1, teacherId);
+            stmt.setString(2, scheduleDate);
+            stmt.setInt(3, checkNo);
+            stmt.setLong(4, excludeClassId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+                return 0;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
-        return count;
     }
 
     /**
@@ -209,11 +254,24 @@ public class ScheduleRepository {
                 AND check_no = ?
                 AND class_id <> ?
                 """;
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, roomId, scheduleDate, checkNo, excludeClassId);
-        if (count == null) {
-            return 0;
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setLong(1, roomId);
+            stmt.setString(2, scheduleDate);
+            stmt.setInt(3, checkNo);
+            stmt.setLong(4, excludeClassId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+                return 0;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
-        return count;
     }
 
     // ---- 更新系 ----
@@ -224,6 +282,10 @@ public class ScheduleRepository {
      * ON CONFLICT (...) DO UPDATE SET ... はSQLiteのUPSERT構文で、
      * 「INSERTしようとして重複したら、代わりにUPDATEする」という意味。
      * excluded.status のようにexcluded.をつけると「今回INSERTしようとしていた値」を指せる。
+     *
+     * teacherId / roomId はJavaの Long（オブジェクト型）なので、値がnullの場合がある
+     * （「休み」の行）。PreparedStatement.setLong()はnullを渡せないため、
+     * nullの時だけsetNull()を使い分けている。
      */
     public void upsertSchedule(
             long classId,
@@ -248,6 +310,33 @@ public class ScheduleRepository {
                     room_id = excluded.room_id,
                     memo = excluded.memo
                 """;
-        jdbcTemplate.update(sql, classId, scheduleDate, checkNo, status, lessonType, teacherId, roomId, memo);
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setLong(1, classId);
+            stmt.setString(2, scheduleDate);
+            stmt.setInt(3, checkNo);
+            stmt.setString(4, status);
+            stmt.setString(5, lessonType);
+
+            if (teacherId == null) {
+                stmt.setNull(6, java.sql.Types.INTEGER);
+            } else {
+                stmt.setLong(6, teacherId);
+            }
+
+            if (roomId == null) {
+                stmt.setNull(7, java.sql.Types.INTEGER);
+            } else {
+                stmt.setLong(7, roomId);
+            }
+
+            stmt.setString(8, memo);
+
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

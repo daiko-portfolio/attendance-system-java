@@ -1,6 +1,7 @@
 package com.example.attendance_system_java;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -8,6 +9,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +39,38 @@ public class PersonController {
             boolean isActive
     ) {}
 
+    /**
+     * RowMapperは名前付きクラスで定義する（ラムダ式は使わない）。
+     * SQLExceptionはここでcatchしてRuntimeExceptionに変換し、throwsを外へ伝えない。
+     */
+    private static class ClassOptionMapper implements RowMapper<ClassOption> {
+        @Override
+        public ClassOption mapRow(ResultSet rs, int rowNum) {
+            try {
+                return new ClassOption(rs.getLong("class_id"), rs.getString("class_name"));
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private static class PersonRowMapper implements RowMapper<PersonRow> {
+        @Override
+        public PersonRow mapRow(ResultSet rs, int rowNum) {
+            try {
+                return new PersonRow(
+                        rs.getLong("person_id"),
+                        rs.getString("class_name"),
+                        rs.getInt("attendance_no"),
+                        rs.getString("name"),
+                        rs.getInt("is_active") != 0
+                );
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
     @GetMapping("/persons")
     public String persons(
             @RequestParam(name = "class_id", required = false) String selectedClassId,
@@ -44,7 +79,7 @@ public class PersonController {
     ) {
         List<ClassOption> classes = jdbcTemplate.query(
                 "SELECT class_id, class_name FROM classes ORDER BY class_id",
-                (rs, rowNum) -> new ClassOption(rs.getLong("class_id"), rs.getString("class_name"))
+                new ClassOptionMapper()
         );
 
         StringBuilder sql = new StringBuilder("""
@@ -75,13 +110,7 @@ public class PersonController {
 
         List<PersonRow> rows = jdbcTemplate.query(
                 sql.toString(),
-                (rs, rowNum) -> new PersonRow(
-                        rs.getLong("person_id"),
-                        rs.getString("class_name"),
-                        rs.getInt("attendance_no"),
-                        rs.getString("name"),
-                        rs.getInt("is_active") != 0
-                ),
+                new PersonRowMapper(),
                 params.toArray()
         );
 
@@ -143,7 +172,13 @@ public class PersonController {
 
                 String attendanceNo = allParams.get("attendance_no_" + personId);
                 String name = allParams.get("name_" + personId);
-                int isActive = allParams.containsKey("is_active_" + personId) ? 1 : 0;
+
+                int isActive;
+                if (allParams.containsKey("is_active_" + personId)) {
+                    isActive = 1;
+                } else {
+                    isActive = 0;
+                }
 
                 jdbcTemplate.update(
                         """

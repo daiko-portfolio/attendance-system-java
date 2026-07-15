@@ -32,6 +32,12 @@ public class RoomService {
         if (roomName == null || roomName.isBlank()) {
             return;
         }
-        roomRepository.update(roomId, roomName.trim(), isActive ? 1 : 0);
+        int isActiveValue;
+        if (isActive) {
+            isActiveValue = 1;
+        } else {
+            isActiveValue = 0;
+        }
+        roomRepository.update(roomId, roomName.trim(), isActiveValue);
     }
 }

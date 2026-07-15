@@ -1,11 +1,14 @@
 package com.example.attendance_system_java;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -91,6 +94,49 @@ public class MonthlyController {
     ) {}
 
     /**
+     * RowMapperは名前付きクラスで定義する（ラムダ式は使わない）。
+     * SQLExceptionはここでcatchしてRuntimeExceptionに変換し、throwsを外へ伝えない。
+     */
+    private static class ClassOptionMapper implements RowMapper<ClassOption> {
+        @Override
+        public ClassOption mapRow(ResultSet rs, int rowNum) {
+            try {
+                return new ClassOption(rs.getLong("class_id"), rs.getString("class_name"));
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private static class PersonOptionMapper implements RowMapper<PersonOption> {
+        @Override
+        public PersonOption mapRow(ResultSet rs, int rowNum) {
+            try {
+                return new PersonOption(rs.getLong("person_id"), rs.getInt("attendance_no"), rs.getString("name"));
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private static class AttendanceRecordMapper implements RowMapper<AttendanceRecord> {
+        @Override
+        public AttendanceRecord mapRow(ResultSet rs, int rowNum) {
+            try {
+                return new AttendanceRecord(
+                        rs.getLong("person_id"),
+                        rs.getString("attendance_date"),
+                        rs.getInt("check_no"),
+                        rs.getString("lesson_type"),
+                        (Integer) rs.getObject("attended_hours")
+                );
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    /**
      * 授業時間を「6時間=1日」換算した日数と余り時間に変換する（例：15h → 2日3h）。
      * 戻り値は長さ2の配列 [日数, 余り時間] としている
      * （Javaのメソッドは戻り値を1つしか返せないため、複数の値をまとめて返したい時に
@@ -121,7 +167,7 @@ public class MonthlyController {
                 WHERE is_active = 1
                 ORDER BY class_id
                 """,
-                (rs, rowNum) -> new ClassOption(rs.getLong("class_id"), rs.getString("class_name"))
+                new ClassOptionMapper()
         );
 
         List<Slot> slots = new ArrayList<>();
@@ -138,7 +184,7 @@ public class MonthlyController {
                     AND is_active = 1
                     ORDER BY attendance_no
                     """,
-                    (rs, rowNum) -> new PersonOption(rs.getLong("person_id"), rs.getInt("attendance_no"), rs.getString("name")),
+                    new PersonOptionMapper(),
                     selectedClassId
             );
 
@@ -157,13 +203,7 @@ public class MonthlyController {
                     AND a.attendance_date < ?
                     ORDER BY a.attendance_date, a.check_no, p.attendance_no
                     """,
-                    (rs, rowNum) -> new AttendanceRecord(
-                            rs.getLong("person_id"),
-                            rs.getString("attendance_date"),
-                            rs.getInt("check_no"),
-                            rs.getString("lesson_type"),
-                            (Integer) rs.getObject("attended_hours")
-                    ),
+                    new AttendanceRecordMapper(),
                     selectedClassId, firstDay.toString(), nextMonthStart.toString()
             );
 

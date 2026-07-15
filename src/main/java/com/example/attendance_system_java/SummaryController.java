@@ -1,11 +1,14 @@
 package com.example.attendance_system_java;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,6 +47,41 @@ public class SummaryController {
             int practicalAttended, int practicalAbsent, int practicalMax, double practicalRate, String practicalJudge
     ) {}
 
+    /**
+     * RowMapperは名前付きクラスで定義する（ラムダ式は使わない）。
+     * SQLExceptionはここでcatchしてRuntimeExceptionに変換し、throwsを外へ伝えない。
+     */
+    private static class ClassOptionMapper implements RowMapper<ClassOption> {
+        @Override
+        public ClassOption mapRow(ResultSet rs, int rowNum) {
+            try {
+                return new ClassOption(rs.getLong("class_id"), rs.getString("class_name"));
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private static class RawSummaryMapper implements RowMapper<RawSummary> {
+        @Override
+        public RawSummary mapRow(ResultSet rs, int rowNum) {
+            try {
+                return new RawSummary(
+                        rs.getInt("attendance_no"),
+                        rs.getString("name"),
+                        rs.getInt("total_attended_hours"),
+                        rs.getInt("total_slots"),
+                        rs.getInt("academic_attended_hours"),
+                        rs.getInt("academic_slots"),
+                        rs.getInt("practical_attended_hours"),
+                        rs.getInt("practical_slots")
+                );
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
     // 出席率のしきい値判定：90%以上は安全、80%以上は注意、それ未満は危険
     private static String judge(double rate) {
         if (rate >= 90) return "安全";
@@ -70,7 +108,7 @@ public class SummaryController {
                 WHERE is_active = 1
                 ORDER BY class_id
                 """,
-                (rs, rowNum) -> new ClassOption(rs.getLong("class_id"), rs.getString("class_name"))
+                new ClassOptionMapper()
         );
 
         List<SummaryRow> rows = new ArrayList<>();
@@ -110,16 +148,7 @@ public class SummaryController {
 
             List<RawSummary> results = jdbcTemplate.query(
                     sql.toString(),
-                    (rs, rowNum) -> new RawSummary(
-                            rs.getInt("attendance_no"),
-                            rs.getString("name"),
-                            rs.getInt("total_attended_hours"),
-                            rs.getInt("total_slots"),
-                            rs.getInt("academic_attended_hours"),
-                            rs.getInt("academic_slots"),
-                            rs.getInt("practical_attended_hours"),
-                            rs.getInt("practical_slots")
-                    ),
+                    new RawSummaryMapper(),
                     params.toArray()
             );
 
@@ -138,9 +167,26 @@ public class SummaryController {
                 int practicalMax = r.practicalSlots() * 3;
                 int practicalAbsent = practicalMax - practicalAttended;
 
-                double academicRate = academicMax > 0 ? (double) academicAttended / academicMax * 100 : 0;
-                double practicalRate = practicalMax > 0 ? (double) practicalAttended / practicalMax * 100 : 0;
-                double totalRate = totalMax > 0 ? (double) totalAttended / totalMax * 100 : 0;
+                double academicRate;
+                if (academicMax > 0) {
+                    academicRate = (double) academicAttended / academicMax * 100;
+                } else {
+                    academicRate = 0;
+                }
+
+                double practicalRate;
+                if (practicalMax > 0) {
+                    practicalRate = (double) practicalAttended / practicalMax * 100;
+                } else {
+                    practicalRate = 0;
+                }
+
+                double totalRate;
+                if (totalMax > 0) {
+                    totalRate = (double) totalAttended / totalMax * 100;
+                } else {
+                    totalRate = 0;
+                }
 
                 rows.add(new SummaryRow(
                         r.attendanceNo(),

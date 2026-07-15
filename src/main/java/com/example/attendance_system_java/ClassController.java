@@ -1,12 +1,15 @@
 package com.example.attendance_system_java;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +34,30 @@ public class ClassController {
             String endDate,
             boolean isActive
     ) {}
+
+    /**
+     * RowMapperは名前付きクラスで定義する（ラムダ式は使わない）。
+     * mapRow()の中でSQLExceptionをcatchしてRuntimeExceptionに変換しているため、
+     * メソッド宣言にthrowsを書かずに済んでいる
+     * （RowMapperインターフェース自体はthrows SQLExceptionを要求するが、
+     *   ここで例外を握って変換すれば、呼び出し元にthrowsを伝える必要が無くなる）。
+     */
+    private static class ClassRowMapper implements RowMapper<ClassRow> {
+        @Override
+        public ClassRow mapRow(ResultSet rs, int rowNum) {
+            try {
+                return new ClassRow(
+                        rs.getLong("class_id"),
+                        rs.getString("class_name"),
+                        rs.getString("start_date"),
+                        rs.getString("end_date"),
+                        rs.getInt("is_active") != 0
+                );
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
 
     @GetMapping("/class/create")
     public String classCreateForm() {
@@ -82,13 +109,7 @@ public class ClassController {
                 FROM classes
                 ORDER BY is_active DESC, end_date DESC, class_id ASC
                 """,
-                (rs, rowNum) -> new ClassRow(
-                        rs.getLong("class_id"),
-                        rs.getString("class_name"),
-                        rs.getString("start_date"),
-                        rs.getString("end_date"),
-                        rs.getInt("is_active") != 0
-                )
+                new ClassRowMapper()
         );
 
         model.addAttribute("rows", rows);
@@ -101,11 +122,17 @@ public class ClassController {
         String className = allParams.get("class_name");
         String startDate = allParams.get("start_date");
         String endDate = allParams.get("end_date");
+
         // チェックボックスはHTMLの仕様上、チェックが外れているとそもそも
         // フォームのパラメータに含まれない（"is_active"というキー自体が来ない）。
         // そのため「値が0だったらチェック無し」ではなく、
         // 「キーが存在するかどうか」で判定する必要がある。
-        int isActive = allParams.containsKey("is_active") ? 1 : 0;
+        int isActive;
+        if (allParams.containsKey("is_active")) {
+            isActive = 1;
+        } else {
+            isActive = 0;
+        }
 
         jdbcTemplate.update(
                 """

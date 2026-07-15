@@ -207,18 +207,48 @@ public class ScheduleController {
                 if (savedRow != null) {
                     // DB登録済みの内容を初期値にする
                     formValues.put("status_" + suffix, savedRow.status());
-                    formValues.put("lesson_" + suffix, savedRow.lessonType() == null ? "学科" : savedRow.lessonType());
-                    formValues.put("teacher_" + suffix, savedRow.teacherId() == null ? "" : savedRow.teacherId().toString());
-                    formValues.put("room_" + suffix, savedRow.roomId() == null ? "" : savedRow.roomId().toString());
-                    formValues.put("memo_" + suffix, savedRow.memo() == null ? "" : savedRow.memo());
+
+                    if (savedRow.lessonType() == null) {
+                        formValues.put("lesson_" + suffix, "学科");
+                    } else {
+                        formValues.put("lesson_" + suffix, savedRow.lessonType());
+                    }
+
+                    if (savedRow.teacherId() == null) {
+                        formValues.put("teacher_" + suffix, "");
+                    } else {
+                        formValues.put("teacher_" + suffix, savedRow.teacherId().toString());
+                    }
+
+                    if (savedRow.roomId() == null) {
+                        formValues.put("room_" + suffix, "");
+                    } else {
+                        formValues.put("room_" + suffix, savedRow.roomId().toString());
+                    }
+
+                    if (savedRow.memo() == null) {
+                        formValues.put("memo_" + suffix, "");
+                    } else {
+                        formValues.put("memo_" + suffix, savedRow.memo());
+                    }
                 } else {
                     // 未登録コマのデフォルト値
                     // 土日は「休み」、平日は「通常」＋そのクラスの標準の場所を初期値にする
-                    formValues.put("status_" + suffix, row.weekend() ? "休み" : "通常");
+                    if (row.weekend()) {
+                        formValues.put("status_" + suffix, "休み");
+                    } else {
+                        formValues.put("status_" + suffix, "通常");
+                    }
+
                     formValues.put("lesson_" + suffix, "学科");
                     formValues.put("teacher_" + suffix, "");
-                    formValues.put("room_" + suffix,
-                            classInfo.defaultRoomId() == null ? "" : classInfo.defaultRoomId().toString());
+
+                    if (classInfo.defaultRoomId() == null) {
+                        formValues.put("room_" + suffix, "");
+                    } else {
+                        formValues.put("room_" + suffix, classInfo.defaultRoomId().toString());
+                    }
+
                     formValues.put("memo_" + suffix, "");
                 }
             }

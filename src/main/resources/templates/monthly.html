@@ -77,9 +77,9 @@
             <span th:text="${slot.checkLabel}"></span>
         </th>
 
-        <th>総合</th>
-        <th>学科</th>
-        <th>実技</th>
+        <th class="monthly-summary-col">総合</th>
+        <th class="monthly-summary-col">学科</th>
+        <th class="monthly-summary-col">実技</th>
     </tr>
 
     <tr th:each="row : ${monthlyRows}">
@@ -97,20 +97,20 @@
             <span th:unless="${cell.attendedHours != null}">未登録</span>
         </td>
 
-        <td>
+        <td class="monthly-summary-col">
             出席：<span th:text="${row.totalAttended}"></span>h<br>
             欠席：<span th:text="${row.totalAbsent}"></span>h<br>
             最大：<span th:text="${row.totalMax}"></span>h<br>
             換算：<span th:text="${row.totalDays}"></span>日<span th:text="${row.totalRestHours}"></span>h
         </td>
 
-        <td>
+        <td class="monthly-summary-col">
             出席：<span th:text="${row.academicAttended}"></span>h<br>
             欠席：<span th:text="${row.academicAbsent}"></span>h<br>
             最大：<span th:text="${row.academicMax}"></span>h
         </td>
 
-        <td>
+        <td class="monthly-summary-col">
             出席：<span th:text="${row.practicalAttended}"></span>h<br>
             欠席：<span th:text="${row.practicalAbsent}"></span>h<br>
             最大：<span th:text="${row.practicalMax}"></span>h

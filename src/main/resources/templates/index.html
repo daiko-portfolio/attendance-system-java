@@ -12,6 +12,10 @@
     <div class="menu-container">
         <h1>出欠管理メニュー</h1>
 
+        <p th:if="${sampleDataLoaded}" style="color:#27ae60; font-weight:bold;">
+            サンプルデータを投入しました。
+        </p>
+
         <div class="menu-section">
             <p class="menu-section-title">メイン業務</p>
 
@@ -70,6 +74,17 @@
             <a class="menu-card btn-update" href="/rooms">
                 部屋管理
             </a>
+        </div>
+
+        <div class="menu-section admin-section">
+            <p class="menu-section-title">デモ用</p>
+
+            <form method="post" th:action="@{/sample-data/load}"
+                  onsubmit="return confirm('既存の全データを削除して、2026年8月分のサンプルデータを投入します。よろしいですか？');">
+                <button type="submit" class="menu-card btn-delete" style="width:100%;">
+                    サンプルデータ投入（既存データは全削除されます）
+                </button>
+            </form>
         </div>
     </div>
 

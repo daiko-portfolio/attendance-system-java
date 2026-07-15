@@ -24,12 +24,13 @@ Spring Boot版で新規追加した機能:
   - 土日はデフォルトで「休み」、平日祝日は手動で「休み」に切り替え可能
   - 同じ教師・同じ場所が同じ時間帯に重複登録されないよう、DBのUNIQUE制約＋事前チェックで排他制御
   - 重複があった場合はその週全体を登録せず、該当セルを赤くハイライトして再入力を促す
+- **授業スケジュールの月次一覧表示**（教室軸・教師軸の2種類）
+- **サンプルデータ投入**（メニュー下部のボタン1つで、既存データを全削除して2026年8月分のデモデータを再投入。ポートフォリオとして初見でも中身のあるデータを見てもらうための機能）
 
 ## 未移植・未実装（Flask版にあってSpring Boot版に無いもの）
 
 - 出欠一覧のCSV出力（`/list/csv`）
 - 教師・場所マスタの編集画面（現在は初期データ登録のみ、コード上での追加はできるがUIが無い）
-- 授業スケジュールの月次一覧表示（教室軸・教師軸）は設計段階、未実装
 
 ## 画面一覧
 
@@ -42,28 +43,33 @@ Spring Boot版で新規追加した機能:
 | `/summary` | 出席率サマリー |
 | `/edit` | 出欠編集・削除 |
 | `/schedule` | 授業スケジュール登録（週単位） |
+| `/schedule/monthly` | スケジュール月次一覧（教室軸） |
+| `/schedule/monthly/teacher` | スケジュール月次一覧（教師軸） |
 | `/class/create` | 新教室作成 |
 | `/classes` | 教室管理 |
 | `/persons` | 受講者管理 |
+| `/teachers` | 教師管理 |
+| `/rooms` | 部屋管理 |
+| `/sample-data/load`（POST） | サンプルデータ投入 |
 
 ## 使用技術
 
 - Java 17
 - Spring Boot（Spring Web, Thymeleaf, JDBC）
-- SQLite（`sqlite-jdbc`ドライバ経由でJdbcTemplateから直接SQLを実行。JPA/Hibernateは不使用）
+- SQLite（`sqlite-jdbc`ドライバ経由で、生JDBCまたはJdbcTemplateから直接SQLを実行。JPA/Hibernateは不使用）
 - Maven
 - HTML/CSS
 
 ## アーキテクチャ
 
-移植のスピードを優先し、既存10画面（出欠登録〜受講者管理）は **Controller内にJdbcTemplateでSQLを直書き** するシンプルな構成にしています。
+Flaskからの移植を優先した画面（出欠登録〜受講者管理の一部）は、**Controller内にJdbcTemplateでSQLを直書き** するシンプルな構成のまま残しています。
 
-一方、新機能の「授業スケジュール登録」は、Spring Bootの標準的な層構成を学ぶ目的も兼ねて **Controller / Service / Repository** の3層に分けて実装しています。
+新機能（授業スケジュール登録・スケジュール月次一覧・サンプルデータ投入等）は、Spring Bootの標準的な層構成と生JDBCを学ぶ目的も兼ねて **Controller / Service / Repository** の3層＋生JDBC（`Connection`/`PreparedStatement`/`ResultSet`のtry-with-resources）で実装しています。ただし業務判断のない単純な一覧取得はService層を挟まずController→Repository直結にする等、画面の性質に応じて層を省略している箇所もあります。
 
 ```
 ScheduleController  … HTTPの受け取り、フォーム⇔業務データの変換、画面表示
 ScheduleService     … 業務ロジック（重複チェック、トランザクション管理）
-ScheduleRepository  … DBアクセス（SQL）
+ScheduleRepository  … DBアクセス（生JDBC）
 ```
 
 重複チェックはアプリ側の事前チェックに加え、最終的にはDBのUNIQUE制約が排他制御の担保になっています（アプリ側のチェックをすり抜けても、DBが確実に拒否する二重の安全策）。
@@ -142,6 +148,4 @@ SQLiteのUNIQUE制約はNULL同士を別物として扱うため、「休み」�
 
 - CSV出力機能の移植
 - 教師・場所マスタの編集画面
-- 授業スケジュールの月次一覧表示（教室軸・教師軸）
-- 出欠登録画面と授業スケジュールの連携（登録済みスケジュールから授業属性を自動反映）
 - テストコードの追加
