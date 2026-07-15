@@ -35,6 +35,12 @@ public class TeacherService {
         if (teacherName == null || teacherName.isBlank()) {
             return;
         }
-        teacherRepository.update(teacherId, teacherName.trim(), isActive ? 1 : 0);
+        int isActiveValue;
+        if (isActive) {
+            isActiveValue = 1;
+        } else {
+            isActiveValue = 0;
+        }
+        teacherRepository.update(teacherId, teacherName.trim(), isActiveValue);
     }
 }

@@ -16,22 +16,36 @@
 -->
 <header class="site-header" th:fragment="siteHeader">
     <a class="nav-link nav-home" href="/">メニュー</a>
-    <a class="nav-link nav-create" href="/register">出欠登録</a>
     <a class="nav-link nav-view" href="/list">出欠一覧</a>
     <a class="nav-link nav-view" href="/monthly">月次表</a>
     <a class="nav-link nav-view" href="/summary">出席率</a>
-    <a class="nav-link nav-update" href="/edit">出欠編集</a>
-    <a class="nav-link nav-create" href="/schedule">スケジュール</a>
+
+    <th:block th:if="${role == 'TEACHER' or role == 'ADMIN'}">
+        <a class="nav-link nav-create" href="/register">出欠登録</a>
+        <a class="nav-link nav-update" href="/edit">出欠編集</a>
+        <a class="nav-link nav-create" href="/schedule">スケジュール</a>
+    </th:block>
     <a class="nav-link nav-view" href="/schedule/monthly">スケジュール月次(教室)</a>
     <a class="nav-link nav-view" href="/schedule/monthly/teacher">スケジュール月次(教師)</a>
 
     <div style="flex-basis: 100%; height: 0;"></div>
 
-    <a class="nav-link nav-create" href="/class/create">新教室作成</a>
-    <a class="nav-link nav-update" href="/classes">教室管理</a>
-    <a class="nav-link nav-update" href="/persons">生徒管理</a>
-    <a class="nav-link nav-update" href="/teachers">教師管理</a>
-    <a class="nav-link nav-update" href="/rooms">部屋管理</a>
+    <th:block th:if="${role == 'TEACHER' or role == 'ADMIN'}">
+        <a class="nav-link nav-create" href="/class/create">新教室作成</a>
+        <a class="nav-link nav-update" href="/classes">教室管理</a>
+        <a class="nav-link nav-update" href="/persons">生徒管理</a>
+        <a class="nav-link nav-update" href="/teachers">教師管理</a>
+        <a class="nav-link nav-update" href="/rooms">部屋管理</a>
+    </th:block>
+
+    <span class="nav-account" th:if="${displayName}">
+        ログイン中：<span th:text="${displayName}"></span>
+        <span th:if="${role == 'TEACHER'}">（教師）</span>
+        <span th:if="${role == 'STUDENT'}">（生徒）</span>
+        <span th:if="${role == 'ADMIN'}">（管理者）</span>
+    </span>
+    <a class="nav-link nav-update" href="/logout"
+       onclick="return confirm('ログアウトしますか？');">ログアウト</a>
 </header>
 
 </body>

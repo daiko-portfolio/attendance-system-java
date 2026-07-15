@@ -12,10 +12,23 @@
     <div class="menu-container">
         <h1>出欠管理メニュー</h1>
 
+        <p th:if="${displayName}">
+            ログイン中：<span th:text="${displayName}"></span>
+            <span th:if="${role == 'TEACHER'}">（教師）</span>
+            <span th:if="${role == 'STUDENT'}">（生徒）</span>
+            <span th:if="${role == 'ADMIN'}">（管理者）</span>
+            ／ <a href="/logout" onclick="return confirm('ログアウトしますか？');">ログアウト</a>
+        </p>
+
+        <p th:if="${sampleDataLoaded}" style="color:#27ae60; font-weight:bold;">
+            サンプルデータを投入しました。
+        </p>
+
         <div class="menu-section">
             <p class="menu-section-title">メイン業務</p>
 
-            <a class="menu-card menu-card-main btn-create" href="/register">
+            <a class="menu-card menu-card-main btn-create" href="/register"
+               th:if="${role == 'TEACHER' or role == 'ADMIN'}">
                 出欠登録
             </a>
 
@@ -31,13 +44,15 @@
                 出席率サマリー
             </a>
 
-            <a class="menu-card btn-update" href="/edit">
-                出欠編集・削除
-            </a>
+            <th:block th:if="${role == 'TEACHER' or role == 'ADMIN'}">
+                <a class="menu-card btn-update" href="/edit">
+                    出欠編集・削除
+                </a>
 
-            <a class="menu-card btn-create" href="/schedule">
-                授業スケジュール登録
-            </a>
+                <a class="menu-card btn-create" href="/schedule">
+                    授業スケジュール登録
+                </a>
+            </th:block>
 
             <a class="menu-card btn-search" href="/schedule/monthly">
                 スケジュール月次（教室別）
@@ -48,7 +63,7 @@
             </a>
         </div>
 
-        <div class="menu-section admin-section">
+        <div class="menu-section admin-section" th:if="${role == 'TEACHER' or role == 'ADMIN'}">
             <p class="menu-section-title">管理メニュー</p>
 
             <a class="menu-card btn-create" href="/class/create">
@@ -70,6 +85,17 @@
             <a class="menu-card btn-update" href="/rooms">
                 部屋管理
             </a>
+        </div>
+
+        <div class="menu-section admin-section" th:if="${role == 'TEACHER' or role == 'ADMIN'}">
+            <p class="menu-section-title">デモ用</p>
+
+            <form method="post" th:action="@{/sample-data/load}"
+                  onsubmit="return confirm('既存の全データを削除して、2026年8月分のサンプルデータを投入します。よろしいですか？');">
+                <button type="submit" class="menu-card btn-delete" style="width:100%;">
+                    サンプルデータ投入（既存データは全削除されます）
+                </button>
+            </form>
         </div>
     </div>
 

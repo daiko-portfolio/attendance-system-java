@@ -353,6 +353,11 @@ input[type="checkbox"]:focus {
     background-color: #f2f3f4;
 }
 
+.monthly-summary-col {
+    min-width: 120px;
+    white-space: nowrap;
+}
+
 
 /* ==============================
    出欠時間分析：判定表示

@@ -2,6 +2,7 @@ package com.example.attendance_system_java;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -28,9 +29,11 @@ import java.util.Map;
 public class DatabaseInitializer implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
+    private final BCryptPasswordEncoder passwordEncoder;
 
-    public DatabaseInitializer(JdbcTemplate jdbcTemplate) {
+    public DatabaseInitializer(JdbcTemplate jdbcTemplate, BCryptPasswordEncoder passwordEncoder) {
         this.jdbcTemplate = jdbcTemplate;
+        this.passwordEncoder = passwordEncoder;
     }
 
     // Spring Bootの起動が完了すると、このrun()メソッドが自動的に1回だけ呼ばれる
@@ -91,6 +94,25 @@ public class DatabaseInitializer implements CommandLineRunner {
                 ON schedules(schedule_date, check_no)
                 """);
 
+        // ログインアカウント
+        // role='TEACHER'ならteacher_id、role='STUDENT'ならperson_idだけを使う
+        // （ADMINはどちらもNULL）。1つのテーブルにまとめて、ログイン時は
+        // ユーザー名から検索してroleを見るだけで教師/生徒/管理者を自動判別できるようにしている。
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS accounts (
+                    account_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    teacher_id INTEGER,
+                    person_id INTEGER,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    CHECK(role IN ('STUDENT', 'TEACHER', 'ADMIN')),
+                    FOREIGN KEY(teacher_id) REFERENCES teachers(teacher_id),
+                    FOREIGN KEY(person_id) REFERENCES persons(person_id)
+                )
+                """);
+
         // classes に default_room_id 列が無ければ追加する
         // SQLiteのALTER TABLEはADD COLUMNをサポートしている
         // （古いDBファイルに対して、後から列を1つ増やす操作。既存データは消えない）
@@ -118,6 +140,33 @@ public class DatabaseInitializer implements CommandLineRunner {
             jdbcTemplate.update("INSERT INTO rooms (room_name) VALUES (?)", "1F教室");
             jdbcTemplate.update("INSERT INTO rooms (room_name) VALUES (?)", "外部A教室");
         }
+
+        // ログイン画面が無いとアプリに入れなくなってしまうため、デモ用の3アカウント
+        // （管理者・教師・生徒）を用意しておく。ポートフォリオのデモ用パスワードなので、
+        // 「無い時だけ作る」ではなく起動のたびに固定パスワードで上書き（UPSERT）している
+        // （こうしておかないと、後でデモ用パスワードを変更した時に古いDBファイルに
+        // 　残った古いパスワードのままになってしまうため）。
+        // teacher_id=1 / person_id=1 は、上の初期データやサンプルデータ投入で
+        // 実際に作られる1件目の教師・生徒（田中／吉田）を指すようにしている。
+        String adminHash = passwordEncoder.encode("AdminDemo2026!");
+        String teacherHash = passwordEncoder.encode("TeacherDemo2026!");
+        String studentHash = passwordEncoder.encode("StudentDemo2026!");
+
+        jdbcTemplate.update("""
+                INSERT INTO accounts (username, password_hash, role)
+                VALUES (?, ?, 'ADMIN')
+                ON CONFLICT (username) DO UPDATE SET password_hash = excluded.password_hash
+                """, "admin", adminHash);
+        jdbcTemplate.update("""
+                INSERT INTO accounts (username, password_hash, role, teacher_id)
+                VALUES (?, ?, 'TEACHER', 1)
+                ON CONFLICT (username) DO UPDATE SET password_hash = excluded.password_hash
+                """, "teacher1", teacherHash);
+        jdbcTemplate.update("""
+                INSERT INTO accounts (username, password_hash, role, person_id)
+                VALUES (?, ?, 'STUDENT', 1)
+                ON CONFLICT (username) DO UPDATE SET password_hash = excluded.password_hash
+                """, "student1", studentHash);
     }
 
     /**
