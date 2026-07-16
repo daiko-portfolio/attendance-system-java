@@ -55,6 +55,50 @@ public class DatabaseInitializer implements CommandLineRunner {
                 )
                 """);
 
+        // 教室/訓練クラス
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS classes (
+                    class_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    class_name TEXT NOT NULL,
+                    start_date TEXT,
+                    end_date TEXT,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    default_room_id INTEGER,
+                    FOREIGN KEY(default_room_id) REFERENCES rooms(room_id)
+                )
+                """);
+
+        // 受講者
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS persons (
+                    person_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    attendance_no INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    class_id INTEGER NOT NULL,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    UNIQUE(attendance_no, class_id),
+                    FOREIGN KEY(class_id) REFERENCES classes(class_id)
+                )
+                """);
+
+        // 出欠
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS attendance (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    attendance_date TEXT NOT NULL,
+                    check_no INTEGER NOT NULL,
+                    person_id INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    lesson_type TEXT NOT NULL DEFAULT '学科',
+                    attended_hours INTEGER NOT NULL DEFAULT 3,
+                    UNIQUE(attendance_date, check_no, person_id),
+                    CHECK(check_no IN (1, 2, 3)),
+                    CHECK(lesson_type IN ('学科', '実技')),
+                    CHECK(attended_hours IN (0, 1, 2, 3)),
+                    FOREIGN KEY(person_id) REFERENCES persons(person_id)
+                )
+                """);
+
         // 授業スケジュール
         // UNIQUE制約3つで排他制御を行う
         //   1. 同じクラスの同じ日・同じ区分に授業は1つだけ
