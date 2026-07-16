@@ -74,15 +74,15 @@
         </td>
 
         <td class="judge-cell">
-            <div th:class="'judge-line ' + (${row.totalJudge == '安全'} ? 'judge-safe' : (${row.totalJudge == '注意'} ? 'judge-warning' : 'judge-danger'))">
+            <div th:class="'judge-line ' + ${row.judgeClass(row.totalJudge)}">
                 総合：<span th:text="${row.totalJudge}"></span>
             </div>
 
-            <div th:class="'judge-line ' + (${row.academicJudge == '安全'} ? 'judge-safe' : (${row.academicJudge == '注意'} ? 'judge-warning' : 'judge-danger'))">
+            <div th:class="'judge-line ' + ${row.judgeClass(row.academicJudge)}">
                 学科：<span th:text="${row.academicJudge}"></span>
             </div>
 
-            <div th:class="'judge-line ' + (${row.practicalJudge == '安全'} ? 'judge-safe' : (${row.practicalJudge == '注意'} ? 'judge-warning' : 'judge-danger'))">
+            <div th:class="'judge-line ' + ${row.judgeClass(row.practicalJudge)}">
                 実技：<span th:text="${row.practicalJudge}"></span>
             </div>
         </td>

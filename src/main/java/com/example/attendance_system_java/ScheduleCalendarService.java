@@ -55,7 +55,25 @@ public class ScheduleCalendarService {
             boolean today,
             CellSlot am,
             CellSlot pm
-    ) {}
+    ) {
+
+        /**
+         * 日付セルに追加するCSSクラス名を返す（三項演算子ではなくif-elseで組み立てる）。
+         */
+        public String cellClass() {
+            String result = "";
+            if (!inMonth) {
+                result += "cal-out ";
+            }
+            if (weekend) {
+                result += "cal-weekend ";
+            }
+            if (today) {
+                result += "cal-today";
+            }
+            return result;
+        }
+    }
 
     /**
      * 教室（コース）ベースのカレンダーを組み立てて返す。

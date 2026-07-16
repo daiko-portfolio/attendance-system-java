@@ -64,7 +64,7 @@
         <td th:text="${row.attendanceDate}"></td>
 
         <!-- 午前 -->
-        <td th:class="${row.morningHours == 3} ? 'status-present' : (${row.morningHours == 0} ? 'status-absent' : (${row.morningHours != null} ? 'status-warning' : 'status-none'))">
+        <td th:class="${row.statusClass(row.morningHours)}">
             <span th:if="${row.morningHours != null}">
                 <span th:text="${row.morningLessonType}"></span><br>
                 <span th:text="${row.morningHours} + 'h'"></span>
@@ -73,7 +73,7 @@
         </td>
 
         <!-- 午後 -->
-        <td th:class="${row.afternoonHours == 3} ? 'status-present' : (${row.afternoonHours == 0} ? 'status-absent' : (${row.afternoonHours != null} ? 'status-warning' : 'status-none'))">
+        <td th:class="${row.statusClass(row.afternoonHours)}">
             <span th:if="${row.afternoonHours != null}">
                 <span th:text="${row.afternoonLessonType}"></span><br>
                 <span th:text="${row.afternoonHours} + 'h'"></span>

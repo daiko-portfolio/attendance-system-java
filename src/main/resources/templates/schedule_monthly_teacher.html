@@ -111,7 +111,7 @@
 
         <tr th:each="week : ${weeks}">
             <td th:each="day : ${week}"
-                th:classappend="(${day.inMonth} ? '' : 'cal-out ') + (${day.weekend} ? 'cal-weekend ' : '') + (${day.today} ? 'cal-today' : '')">
+                th:classappend="${day.cellClass()}">
 
                 <div class="cal-day-num" th:text="${day.dayOfMonth}"></div>
 

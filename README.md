@@ -84,9 +84,9 @@
 
 ## アーキテクチャ
 
-古い画面（出欠登録〜受講者管理の一部）は、Controller内にJdbcTemplateでSQLを直書きするシンプルな構成のままにしています。
+DBアクセスは全画面とも生JDBC（`Connection`/`PreparedStatement`/`ResultSet`のtry-with-resources）に統一しています。C#のADO.NET（`SqlConnection`/`SqlCommand`/`SqlDataReader`）とほぼ1対1で対応する書き方です。ORMやJdbcTemplateに頼らず、接続の取得からクローズまでを自分で書くことで、DBアクセスの仕組みを隠さない構成にしています（例外はDDL実行だけの`DatabaseInitializer`と、SQLファイルを流すだけの`SampleDataService`で、この2つは単純なSQL実行の繰り返しなのでJdbcTemplateを使っています）。
 
-新しめの機能（スケジュール登録・月次一覧・サンプルデータ投入）は、Controller / Service / Repositoryの3層＋生JDBC（`Connection`/`PreparedStatement`/`ResultSet`のtry-with-resources）で書いています。層構成やJDBCの書き方を学びながら進めているので、画面によって書き方の新旧が混在しているのはそのためです。ただし業務判断のない単純な一覧取得はService層を挟まずController→Repository直結にしています。
+層構成は、業務判断（重複チェックなどの分岐）がある機能はController / Service / Repositoryの3層、業務判断のない単純な検索・登録の画面はControllerにSQLを直接書くシンプルな構成、と画面の性質で使い分けています。
 
 ```
 ScheduleController  … HTTPの受け取り、フォーム⇔業務データの変換、画面表示

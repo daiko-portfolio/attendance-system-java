@@ -1,12 +1,13 @@
 package com.example.attendance_system_java;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -16,14 +17,18 @@ import java.util.List;
  * 出席率サマリー画面のController。
  * SQL側でSUM/COUNTを使って集計まで済ませてから受け取り、
  * Java側では「集計値を%や日数に変換するだけ」の役割分担にしている。
+ *
+ * DBアクセスは生JDBC（Connection/PreparedStatement/ResultSet）で書いている。
+ * SQLExceptionはこのクラス内でキャッチしてRuntimeExceptionに変換し、
+ * 呼び出し元にthrowsを伝播させない。
  */
 @Controller
 public class SummaryController {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final DataSource dataSource;
 
-    public SummaryController(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public SummaryController(DataSource dataSource) {
+        this.dataSource = dataSource;
     }
 
     public record ClassOption(long classId, String className) {}
@@ -45,40 +50,20 @@ public class SummaryController {
             int totalAttended, int totalAbsent, int totalMax, double totalRate, String totalJudge,
             int academicAttended, int academicAbsent, int academicMax, double academicRate, String academicJudge,
             int practicalAttended, int practicalAbsent, int practicalMax, double practicalRate, String practicalJudge
-    ) {}
+    ) {
 
-    /**
-     * RowMapperは名前付きクラスで定義する（ラムダ式は使わない）。
-     * SQLExceptionはここでcatchしてRuntimeExceptionに変換し、throwsを外へ伝えない。
-     */
-    private static class ClassOptionMapper implements RowMapper<ClassOption> {
-        @Override
-        public ClassOption mapRow(ResultSet rs, int rowNum) {
-            try {
-                return new ClassOption(rs.getLong("class_id"), rs.getString("class_name"));
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
+        /**
+         * 判定文字列（安全/注意/危険）からCSSクラス名を返す。
+         * 三項演算子ではなくif-elseで判定する。
+         */
+        public String judgeClass(String judge) {
+            if (judge.equals("安全")) {
+                return "judge-safe";
             }
-        }
-    }
-
-    private static class RawSummaryMapper implements RowMapper<RawSummary> {
-        @Override
-        public RawSummary mapRow(ResultSet rs, int rowNum) {
-            try {
-                return new RawSummary(
-                        rs.getInt("attendance_no"),
-                        rs.getString("name"),
-                        rs.getInt("total_attended_hours"),
-                        rs.getInt("total_slots"),
-                        rs.getInt("academic_attended_hours"),
-                        rs.getInt("academic_slots"),
-                        rs.getInt("practical_attended_hours"),
-                        rs.getInt("practical_slots")
-                );
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
+            if (judge.equals("注意")) {
+                return "judge-warning";
             }
+            return "judge-danger";
         }
     }
 
@@ -101,20 +86,29 @@ public class SummaryController {
             @RequestParam(name = "end_date", required = false) String endDate,
             Model model
     ) {
-        List<ClassOption> classes = jdbcTemplate.query(
-                """
-                SELECT class_id, class_name
-                FROM classes
-                WHERE is_active = 1
-                ORDER BY class_id
-                """,
-                new ClassOptionMapper()
-        );
+        List<ClassOption> classes = new ArrayList<>();
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement("""
+                     SELECT class_id, class_name
+                     FROM classes
+                     WHERE is_active = 1
+                     ORDER BY class_id
+                     """);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                classes.add(new ClassOption(rs.getLong("class_id"), rs.getString("class_name")));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
 
         List<SummaryRow> rows = new ArrayList<>();
 
         if (selectedClassId != null && !selectedClassId.isBlank()) {
 
+            // 期間（開始日・終了日）は指定された時だけWHERE句に足していく
             StringBuilder sql = new StringBuilder("""
                     SELECT
                         p.attendance_no,
@@ -146,11 +140,32 @@ public class SummaryController {
 
             sql.append(" GROUP BY p.attendance_no, p.name ORDER BY p.attendance_no ASC");
 
-            List<RawSummary> results = jdbcTemplate.query(
-                    sql.toString(),
-                    new RawSummaryMapper(),
-                    params.toArray()
-            );
+            List<RawSummary> results = new ArrayList<>();
+
+            try (Connection conn = dataSource.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql.toString())) {
+
+                for (int i = 0; i < params.size(); i++) {
+                    stmt.setObject(i + 1, params.get(i));
+                }
+
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        results.add(new RawSummary(
+                                rs.getInt("attendance_no"),
+                                rs.getString("name"),
+                                rs.getInt("total_attended_hours"),
+                                rs.getInt("total_slots"),
+                                rs.getInt("academic_attended_hours"),
+                                rs.getInt("academic_slots"),
+                                rs.getInt("practical_attended_hours"),
+                                rs.getInt("practical_slots")
+                        ));
+                    }
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
 
             // SQLで集計した「合計出席時間」「コマ数」から、
             // 最大値（コマ数×3h）・欠席時間・出席率をJava側で計算する

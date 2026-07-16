@@ -1,21 +1,22 @@
 package com.example.attendance_system_java;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeSet;
 
 /**
  * 月次出欠表画面のController。全Controllerの中で最も処理が複雑な画面。
@@ -32,14 +33,18 @@ import java.util.TreeSet;
  * recordは自動でequals()/hashCode()を実装してくれるため、
  * 同じ値を持つ2つのAttendanceKeyは「同じキー」としてMapやSetで正しく扱われる
  * （もし普通のクラスで作ると、この自動生成が無く別物として扱われてしまう）。
+ *
+ * DBアクセスは生JDBC（Connection/PreparedStatement/ResultSet）で書いている。
+ * SQLExceptionはこのクラス内でキャッチしてRuntimeExceptionに変換し、
+ * 呼び出し元にthrowsを伝播させない。
  */
 @Controller
 public class MonthlyController {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final DataSource dataSource;
 
-    public MonthlyController(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public MonthlyController(DataSource dataSource) {
+        this.dataSource = dataSource;
     }
 
     public record ClassOption(long classId, String className) {}
@@ -58,17 +63,9 @@ public class MonthlyController {
     private record AttendanceKey(long personId, String attendanceDate, int checkNo) {}
 
     // 「この日付・この午前午後」という、表の列（1コマ分）を表すキー。
-    // Comparable<SlotKey>を実装しているのは、この後 TreeSet<SlotKey> に入れて
-    // 自動的に日付順・午前午後順に並び替えさせるため
-    // （TreeSetは追加した要素を、compareTo()の結果に従って常に並び替えて保持してくれる）
-    private record SlotKey(String attendanceDate, int checkNo) implements Comparable<SlotKey> {
-        @Override
-        public int compareTo(SlotKey other) {
-            int cmp = this.attendanceDate.compareTo(other.attendanceDate);
-            if (cmp != 0) return cmp;
-            return Integer.compare(this.checkNo, other.checkNo);
-        }
-    }
+    // 元のSQL（ORDER BY attendance_date, check_no）が既に日付・午前午後順で
+    // 返してくれるので、ここでは並び替えは行わず、そのままの順序で1回ずつ集める。
+    private record SlotKey(String attendanceDate, int checkNo) {}
 
     // 表の列見出し（例：「7/6」「AM」）を表示用に持つ入れ物
     public record Slot(String date, int checkNo, String dateLabel, String checkLabel) {}
@@ -82,7 +79,27 @@ public class MonthlyController {
     }
 
     // 表の1マス分（ある生徒の、ある日付・午前午後のセル）の表示内容
-    public record Cell(String lessonType, Integer attendedHours) {}
+    public record Cell(String lessonType, Integer attendedHours) {
+
+        /**
+         * セルの背景色を決めるCSSクラス名を返す。
+         * 三項演算子は使わず、Javaの規約どおりif-elseで書く
+         * （Thymeleaf側にこの判定を書くと三項演算子の入れ子になって読みにくいため、
+         *  ここで文字列を組み立てて、テンプレート側は参照するだけにしている）。
+         */
+        public String statusClass() {
+            if (attendedHours == null) {
+                return "status-none";
+            }
+            if (attendedHours == 3) {
+                return "status-present";
+            }
+            if (attendedHours == 0) {
+                return "status-absent";
+            }
+            return "status-warning";
+        }
+    }
 
     public record MonthlyRow(
             int attendanceNo,
@@ -93,57 +110,16 @@ public class MonthlyController {
             int practicalAttended, int practicalAbsent, int practicalMax
     ) {}
 
-    /**
-     * RowMapperは名前付きクラスで定義する（ラムダ式は使わない）。
-     * SQLExceptionはここでcatchしてRuntimeExceptionに変換し、throwsを外へ伝えない。
-     */
-    private static class ClassOptionMapper implements RowMapper<ClassOption> {
-        @Override
-        public ClassOption mapRow(ResultSet rs, int rowNum) {
-            try {
-                return new ClassOption(rs.getLong("class_id"), rs.getString("class_name"));
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    private static class PersonOptionMapper implements RowMapper<PersonOption> {
-        @Override
-        public PersonOption mapRow(ResultSet rs, int rowNum) {
-            try {
-                return new PersonOption(rs.getLong("person_id"), rs.getInt("attendance_no"), rs.getString("name"));
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    private static class AttendanceRecordMapper implements RowMapper<AttendanceRecord> {
-        @Override
-        public AttendanceRecord mapRow(ResultSet rs, int rowNum) {
-            try {
-                return new AttendanceRecord(
-                        rs.getLong("person_id"),
-                        rs.getString("attendance_date"),
-                        rs.getInt("check_no"),
-                        rs.getString("lesson_type"),
-                        (Integer) rs.getObject("attended_hours")
-                );
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
+    // convertHoursToDays()の戻り値。日数と余り時間の2つをまとめて返すための入れ物
+    // （Javaのメソッドは戻り値を1つしか返せないため、複数の値をまとめて返したい時に
+    //  こうしたrecordがよく使われる。配列 [日数, 余り時間] より、名前が付いている分読みやすい）
+    private record DaysHours(int days, int restHours) {}
 
     /**
      * 授業時間を「6時間=1日」換算した日数と余り時間に変換する（例：15h → 2日3h）。
-     * 戻り値は長さ2の配列 [日数, 余り時間] としている
-     * （Javaのメソッドは戻り値を1つしか返せないため、複数の値をまとめて返したい時に
-     *  こうした配列やrecordがよく使われる）。
      */
-    private static int[] convertHoursToDays(int hours) {
-        return new int[] { hours / 6, hours % 6 };
+    private static DaysHours convertHoursToDays(int hours) {
+        return new DaysHours(hours / 6, hours % 6);
     }
 
     @GetMapping("/monthly")
@@ -160,15 +136,23 @@ public class MonthlyController {
         LocalDate firstDay = yearMonth.atDay(1);
         LocalDate nextMonthStart = yearMonth.plusMonths(1).atDay(1);
 
-        List<ClassOption> classes = jdbcTemplate.query(
-                """
-                SELECT class_id, class_name
-                FROM classes
-                WHERE is_active = 1
-                ORDER BY class_id
-                """,
-                new ClassOptionMapper()
-        );
+        List<ClassOption> classes = new ArrayList<>();
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement("""
+                     SELECT class_id, class_name
+                     FROM classes
+                     WHERE is_active = 1
+                     ORDER BY class_id
+                     """);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                classes.add(new ClassOption(rs.getLong("class_id"), rs.getString("class_name")));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
 
         List<Slot> slots = new ArrayList<>();
         List<MonthlyRow> monthlyRows = new ArrayList<>();
@@ -176,44 +160,86 @@ public class MonthlyController {
 
         if (selectedClassId != null && !selectedClassId.isBlank()) {
 
-            List<PersonOption> persons = jdbcTemplate.query(
-                    """
-                    SELECT person_id, attendance_no, name
-                    FROM persons
-                    WHERE class_id = ?
-                    AND is_active = 1
-                    ORDER BY attendance_no
-                    """,
-                    new PersonOptionMapper(),
-                    selectedClassId
-            );
+            List<PersonOption> persons = new ArrayList<>();
 
-            List<AttendanceRecord> records = jdbcTemplate.query(
-                    """
-                    SELECT
-                        p.person_id,
-                        a.attendance_date,
-                        a.check_no,
-                        a.lesson_type,
-                        a.attended_hours
-                    FROM attendance a
-                    JOIN persons p ON a.person_id = p.person_id
-                    WHERE p.class_id = ?
-                    AND a.attendance_date >= ?
-                    AND a.attendance_date < ?
-                    ORDER BY a.attendance_date, a.check_no, p.attendance_no
-                    """,
-                    new AttendanceRecordMapper(),
-                    selectedClassId, firstDay.toString(), nextMonthStart.toString()
-            );
+            try (Connection conn = dataSource.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement("""
+                         SELECT person_id, attendance_no, name
+                         FROM persons
+                         WHERE class_id = ?
+                         AND is_active = 1
+                         ORDER BY attendance_no
+                         """)) {
+
+                stmt.setString(1, selectedClassId);
+
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        persons.add(new PersonOption(
+                                rs.getLong("person_id"),
+                                rs.getInt("attendance_no"),
+                                rs.getString("name")
+                        ));
+                    }
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+
+            List<AttendanceRecord> records = new ArrayList<>();
+
+            try (Connection conn = dataSource.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement("""
+                         SELECT
+                             p.person_id,
+                             a.attendance_date,
+                             a.check_no,
+                             a.lesson_type,
+                             a.attended_hours
+                         FROM attendance a
+                         JOIN persons p ON a.person_id = p.person_id
+                         WHERE p.class_id = ?
+                         AND a.attendance_date >= ?
+                         AND a.attendance_date < ?
+                         ORDER BY a.attendance_date, a.check_no, p.attendance_no
+                         """)) {
+
+                stmt.setString(1, selectedClassId);
+                stmt.setString(2, firstDay.toString());
+                stmt.setString(3, nextMonthStart.toString());
+
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        // attended_hoursはNULLの可能性があるため、getInt()（NULLだと0になる）ではなく
+                        // getObject()で受けてから型を確認して変換する
+                        Integer attendedHours = null;
+                        Object rawHours = rs.getObject("attended_hours");
+                        if (rawHours instanceof Number) {
+                            attendedHours = ((Number) rawHours).intValue();
+                        }
+
+                        records.add(new AttendanceRecord(
+                                rs.getLong("person_id"),
+                                rs.getString("attendance_date"),
+                                rs.getInt("check_no"),
+                                rs.getString("lesson_type"),
+                                attendedHours
+                        ));
+                    }
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
 
             // DBから取ってきた「1行=1生徒×1日×午前午後」のrecordsを、
             // 探しやすい形（Map）に詰め替える。
             //   attendanceMap : 「この生徒のこのコマ」→ そのデータ、を高速に引くため
-            //   slotSet       : 表の列を「日付の重複なし・順序どおり」に集めるため（TreeSetなので自動で整列される）
+            //   slotSet       : 表の列を「日付の重複なし・順序どおり」に集めるため
+            //                   （SQLが既に日付・午前午後順で返してくれているので、
+            //                    LinkedHashSetで登場順のまま重複だけ除けばよい）
             //   slotTypeMap   : 各コマの授業属性（学科/実技）を1回引くだけで済むように
             Map<AttendanceKey, AttendanceRecord> attendanceMap = new HashMap<>();
-            TreeSet<SlotKey> slotSet = new TreeSet<>();
+            LinkedHashSet<SlotKey> slotSet = new LinkedHashSet<>();
             Map<SlotKey, String> slotTypeMap = new HashMap<>();
 
             for (AttendanceRecord record : records) {
@@ -225,7 +251,7 @@ public class MonthlyController {
                 slotTypeMap.put(slotKey, record.lessonType());
             }
 
-            // slotSetの中身（TreeSetなので日付・午前午後順に並んでいる）から、
+            // slotSetの中身（登場した順＝日付・午前午後順に並んでいる）から、
             // 表の列見出し用データ（Slot）を組み立てる
             for (SlotKey slotKey : slotSet) {
                 String dateLabel = Integer.parseInt(slotKey.attendanceDate().substring(5, 7))
@@ -256,17 +282,17 @@ public class MonthlyController {
                 }
             }
 
-            int[] totalDaysHours = convertHoursToDays(monthSummary.totalMax);
-            monthSummary.totalDays = totalDaysHours[0];
-            monthSummary.totalRestHours = totalDaysHours[1];
+            DaysHours totalDaysHours = convertHoursToDays(monthSummary.totalMax);
+            monthSummary.totalDays = totalDaysHours.days();
+            monthSummary.totalRestHours = totalDaysHours.restHours();
 
-            int[] academicDaysHours = convertHoursToDays(monthSummary.academicMax);
-            monthSummary.academicDays = academicDaysHours[0];
-            monthSummary.academicRestHours = academicDaysHours[1];
+            DaysHours academicDaysHours = convertHoursToDays(monthSummary.academicMax);
+            monthSummary.academicDays = academicDaysHours.days();
+            monthSummary.academicRestHours = academicDaysHours.restHours();
 
-            int[] practicalDaysHours = convertHoursToDays(monthSummary.practicalMax);
-            monthSummary.practicalDays = practicalDaysHours[0];
-            monthSummary.practicalRestHours = practicalDaysHours[1];
+            DaysHours practicalDaysHours = convertHoursToDays(monthSummary.practicalMax);
+            monthSummary.practicalDays = practicalDaysHours.days();
+            monthSummary.practicalRestHours = practicalDaysHours.restHours();
 
             for (PersonOption person : persons) {
 
@@ -310,13 +336,13 @@ public class MonthlyController {
                 int academicAbsent = academicMax - academicAttended;
                 int practicalAbsent = practicalMax - practicalAttended;
 
-                int[] totalDaysRest = convertHoursToDays(totalAttended);
+                DaysHours totalDaysRest = convertHoursToDays(totalAttended);
 
                 monthlyRows.add(new MonthlyRow(
                         person.attendanceNo(),
                         person.name(),
                         cells,
-                        totalAttended, totalAbsent, totalMax, totalDaysRest[0], totalDaysRest[1],
+                        totalAttended, totalAbsent, totalMax, totalDaysRest.days(), totalDaysRest.restHours(),
                         academicAttended, academicAbsent, academicMax,
                         practicalAttended, practicalAbsent, practicalMax
                 ));

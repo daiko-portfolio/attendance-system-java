@@ -49,7 +49,7 @@
 
     <p>
         日付：<span th:text="${selectedDate}"></span>
-        ／区分：<span th:text="${selectedCheckNo == '1'} ? '午前' : '午後'"></span>
+        ／区分：<span th:if="${selectedCheckNo == '1'}">午前</span><span th:unless="${selectedCheckNo == '1'}">午後</span>
         ／授業属性：
         <select name="lesson_type" required>
             <option value="学科" th:selected="${selectedLessonType == '学科'}">学科</option>
@@ -93,7 +93,7 @@
                         type="radio"
                         th:name="${'attended_hours_' + person.personId}"
                         value="3"
-                        th:checked="${hasData} ? ${curHours == 3} : true"
+                        th:checked="${!hasData or curHours == 3}"
                     >
                     <span>全出席</span>
                 </label>

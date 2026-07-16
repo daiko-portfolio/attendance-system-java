@@ -38,7 +38,25 @@ public class ListRepository {
             Integer morningHours,
             String afternoonLessonType,
             Integer afternoonHours
-    ) {}
+    ) {
+
+        /**
+         * 出席時間（午前・午後どちらにも使える）からCSSクラス名を返す。
+         * 三項演算子ではなくif-elseで判定する。
+         */
+        public String statusClass(Integer hours) {
+            if (hours == null) {
+                return "status-none";
+            }
+            if (hours == 3) {
+                return "status-present";
+            }
+            if (hours == 0) {
+                return "status-absent";
+            }
+            return "status-warning";
+        }
+    }
 
     /**
      * 有効な教室一覧を取得する

@@ -1,7 +1,5 @@
 package com.example.attendance_system_java;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,6 +7,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -19,14 +20,18 @@ import java.util.Map;
  * 生徒管理画面のController。
  * 一覧の一括更新は "person_id_<id>" のような動的なパラメータ名を使い、
  * RegisterController/EditControllerと同じMap受け取りの仕組みを使っている。
+ *
+ * DBアクセスは生JDBC（Connection/PreparedStatement/ResultSet）で書いている。
+ * SQLExceptionはこのクラス内でキャッチしてRuntimeExceptionに変換し、
+ * 呼び出し元にthrowsを伝播させない。
  */
 @Controller
 public class PersonController {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final DataSource dataSource;
 
-    public PersonController(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public PersonController(DataSource dataSource) {
+        this.dataSource = dataSource;
     }
 
     public record ClassOption(long classId, String className) {}
@@ -39,49 +44,28 @@ public class PersonController {
             boolean isActive
     ) {}
 
-    /**
-     * RowMapperは名前付きクラスで定義する（ラムダ式は使わない）。
-     * SQLExceptionはここでcatchしてRuntimeExceptionに変換し、throwsを外へ伝えない。
-     */
-    private static class ClassOptionMapper implements RowMapper<ClassOption> {
-        @Override
-        public ClassOption mapRow(ResultSet rs, int rowNum) {
-            try {
-                return new ClassOption(rs.getLong("class_id"), rs.getString("class_name"));
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    private static class PersonRowMapper implements RowMapper<PersonRow> {
-        @Override
-        public PersonRow mapRow(ResultSet rs, int rowNum) {
-            try {
-                return new PersonRow(
-                        rs.getLong("person_id"),
-                        rs.getString("class_name"),
-                        rs.getInt("attendance_no"),
-                        rs.getString("name"),
-                        rs.getInt("is_active") != 0
-                );
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
     @GetMapping("/persons")
     public String persons(
             @RequestParam(name = "class_id", required = false) String selectedClassId,
             @RequestParam(name = "name", required = false) String searchName,
             Model model
     ) {
-        List<ClassOption> classes = jdbcTemplate.query(
-                "SELECT class_id, class_name FROM classes ORDER BY class_id",
-                new ClassOptionMapper()
-        );
+        List<ClassOption> classes = new ArrayList<>();
 
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                     "SELECT class_id, class_name FROM classes ORDER BY class_id");
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                classes.add(new ClassOption(rs.getLong("class_id"), rs.getString("class_name")));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        // 検索条件（教室・名前）は指定された時だけWHERE句に足していく。
+        // ListRepositoryと同じ「SQLとパラメータのリストを一緒に育てる」書き方。
         StringBuilder sql = new StringBuilder("""
                 SELECT
                     p.person_id,
@@ -108,11 +92,29 @@ public class PersonController {
 
         sql.append(" ORDER BY c.class_id, p.attendance_no");
 
-        List<PersonRow> rows = jdbcTemplate.query(
-                sql.toString(),
-                new PersonRowMapper(),
-                params.toArray()
-        );
+        List<PersonRow> rows = new ArrayList<>();
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql.toString())) {
+
+            for (int i = 0; i < params.size(); i++) {
+                stmt.setObject(i + 1, params.get(i));
+            }
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    rows.add(new PersonRow(
+                            rs.getLong("person_id"),
+                            rs.getString("class_name"),
+                            rs.getInt("attendance_no"),
+                            rs.getString("name"),
+                            rs.getInt("is_active") != 0
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
 
         // 「新規生徒追加」フォームの出席番号欄に初期値として入れる番号。
         // 選択中の教室の中で一番大きい出席番号+1を提案する（COALESCEは、
@@ -120,12 +122,20 @@ public class PersonController {
         int nextAttendanceNo = 1;
 
         if (selectedClassId != null && !selectedClassId.isBlank()) {
-            Integer next = jdbcTemplate.queryForObject(
-                    "SELECT COALESCE(MAX(attendance_no), 0) + 1 FROM persons WHERE class_id = ?",
-                    Integer.class,
-                    selectedClassId
-            );
-            nextAttendanceNo = next;
+            try (Connection conn = dataSource.getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(
+                         "SELECT COALESCE(MAX(attendance_no), 0) + 1 FROM persons WHERE class_id = ?")) {
+
+                stmt.setString(1, selectedClassId);
+
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        nextAttendanceNo = rs.getInt(1);
+                    }
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         model.addAttribute("classes", classes);
@@ -144,13 +154,21 @@ public class PersonController {
             @RequestParam("name") String name,
             RedirectAttributes redirectAttributes
     ) {
-        jdbcTemplate.update(
-                """
+        String sql = """
                 INSERT INTO persons (attendance_no, name, class_id, is_active)
                 VALUES (?, ?, ?, 1)
-                """,
-                attendanceNo, name, classId
-        );
+                """;
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, attendanceNo);
+            stmt.setString(2, name);
+            stmt.setString(3, classId);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
 
         redirectAttributes.addAttribute("class_id", classId);
         return "redirect:/persons";
@@ -164,31 +182,42 @@ public class PersonController {
         String selectedClassId = allParams.get("selected_class_id");
         String searchName = allParams.get("search_name");
 
-        for (Map.Entry<String, String> entry : allParams.entrySet()) {
-            String key = entry.getKey();
+        String sql = """
+                UPDATE persons
+                SET attendance_no = ?, name = ?, is_active = ?
+                WHERE person_id = ?
+                """;
 
-            if (key.startsWith("person_id_")) {
-                String personId = key.substring("person_id_".length());
+        // 複数の生徒を1回のフォーム送信でまとめて更新するため、
+        // 接続とPreparedStatementは1回だけ用意して、ループ内では値の差し替えと実行だけを行う
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-                String attendanceNo = allParams.get("attendance_no_" + personId);
-                String name = allParams.get("name_" + personId);
+            for (Map.Entry<String, String> entry : allParams.entrySet()) {
+                String key = entry.getKey();
 
-                int isActive;
-                if (allParams.containsKey("is_active_" + personId)) {
-                    isActive = 1;
-                } else {
-                    isActive = 0;
+                if (key.startsWith("person_id_")) {
+                    String personId = key.substring("person_id_".length());
+
+                    String attendanceNo = allParams.get("attendance_no_" + personId);
+                    String name = allParams.get("name_" + personId);
+
+                    int isActive;
+                    if (allParams.containsKey("is_active_" + personId)) {
+                        isActive = 1;
+                    } else {
+                        isActive = 0;
+                    }
+
+                    stmt.setString(1, attendanceNo);
+                    stmt.setString(2, name);
+                    stmt.setInt(3, isActive);
+                    stmt.setString(4, personId);
+                    stmt.executeUpdate();
                 }
-
-                jdbcTemplate.update(
-                        """
-                        UPDATE persons
-                        SET attendance_no = ?, name = ?, is_active = ?
-                        WHERE person_id = ?
-                        """,
-                        attendanceNo, name, isActive, personId
-                );
             }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
 
         redirectAttributes.addAttribute("class_id", selectedClassId);

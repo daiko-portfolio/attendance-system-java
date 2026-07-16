@@ -58,7 +58,25 @@ public class ScheduleController {
      * 画面の1行分（例：7/6(月) 午前）
      * dayIndex は月曜=0〜日曜=6のその週の中での順番。
      */
-    public record RowInfo(int dayIndex, int checkNo, String dateStr, String label, boolean weekend) {}
+    public record RowInfo(int dayIndex, int checkNo, String dateStr, String label, boolean weekend) {
+
+        /**
+         * 行の背景色を決めるCSSクラス名を返す（三項演算子ではなくif-elseで判定）。
+         * dayIndex==5が土曜、weekendがtrueで土曜でなければ日曜。
+         */
+        public String rowClass() {
+            if (weekend) {
+                if (dayIndex == 5) {
+                    return "row-saturday";
+                }
+                return "row-sunday";
+            }
+            if (checkNo == 1) {
+                return "row-am";
+            }
+            return "row-pm";
+        }
+    }
 
     // 表示は月曜始まり（dayIndex 0=月 ... 6=日）
     private static final String[] DAY_LABELS = {"月", "火", "水", "木", "金", "土", "日"};

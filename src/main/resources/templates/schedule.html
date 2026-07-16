@@ -92,7 +92,7 @@
         </tr>
 
         <tr th:each="row : ${rows}"
-            th:classappend="${row.weekend} ? (${row.dayIndex} == 5 ? 'row-saturday' : 'row-sunday') : (${row.checkNo} == 1 ? 'row-am' : 'row-pm')">
+            th:classappend="${row.rowClass()}">
 
             <td th:text="${row.label}"></td>
 
