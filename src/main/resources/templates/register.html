@@ -87,8 +87,18 @@
             <td th:text="${person.attendanceNo}"></td>
             <td th:text="${person.name}"></td>
 
+            <!--
+              th:with は「この<td>の中だけで使える変数」を定義するThymeleafの機能。
+                hasData  … この生徒の出欠が登録済みかどうか（currentHoursというMapにキーがあるか）
+                curHours … 登録済みの出席時間（未登録ならnull）
+              毎回 currentHours.get(...) を書かずに済むよう、先に短い名前を付けている。
+
+              ラジオボタンのname属性は "attended_hours_生徒ID" という動的な名前にしていて、
+              Controller側では前方一致（attended_hours_で始まるか）で拾い出す仕組み。
+            -->
             <td th:with="hasData=${currentHours.containsKey(person.personId)}, curHours=${currentHours.get(person.personId)}">
                 <label class="radio-btn radio-present">
+                    <!-- 「全出席」の初期選択条件：未登録なら初期値として選択、登録済みなら保存値が3の時だけ選択 -->
                     <input
                         type="radio"
                         th:name="${'attended_hours_' + person.personId}"

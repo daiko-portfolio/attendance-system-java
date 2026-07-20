@@ -84,17 +84,19 @@
 
 ## アーキテクチャ
 
-DBアクセスは全画面とも生JDBC（`Connection`/`PreparedStatement`/`ResultSet`のtry-with-resources）に統一しています。C#のADO.NET（`SqlConnection`/`SqlCommand`/`SqlDataReader`）とほぼ1対1で対応する書き方です。ORMやJdbcTemplateに頼らず、接続の取得からクローズまでを自分で書くことで、DBアクセスの仕組みを隠さない構成にしています（例外はDDL実行だけの`DatabaseInitializer`と、SQLファイルを流すだけの`SampleDataService`で、この2つは単純なSQL実行の繰り返しなのでJdbcTemplateを使っています）。
+DBアクセスは全画面とも生JDBC（`Connection`/`PreparedStatement`/`ResultSet`のtry-with-resources）に統一しています。C#のADO.NET（`SqlConnection`/`SqlCommand`/`SqlDataReader`）とほぼ1対1で対応する書き方で、ORMやJdbcTemplateに頼らず接続の取得からクローズまでを自分で書き、DBアクセスの仕組みを隠さないことを優先しました（例外はDDL実行だけの`DatabaseInitializer`と、SQLファイルを流すだけの`SampleDataService`。この2つは単純なSQL実行の繰り返しなのでJdbcTemplateのままです）。
 
 層構成は、業務判断（重複チェックなどの分岐）がある機能はController / Service / Repositoryの3層、業務判断のない単純な検索・登録の画面はControllerにSQLを直接書くシンプルな構成、と画面の性質で使い分けています。
 
 ```
 ScheduleController  … HTTPの受け取り、フォーム⇔業務データの変換、画面表示
-ScheduleService     … 業務ロジック（重複チェック、トランザクション管理）
-ScheduleRepository  … DBアクセス（生JDBC）
+ScheduleService     … 業務ロジック（教師・場所の重複チェック）
+ScheduleRepository  … DBアクセス（生JDBC。週の入れ替えをJDBCのトランザクションで実行）
 ```
 
-重複チェックはアプリ側の事前チェックに加え、最終的にはDBのUNIQUE制約が排他制御の担保になっています（アプリ側のチェックをすり抜けても、DBが確実に拒否する二重の安全策）。
+スケジュールの登録は「対象週×対象クラスの範囲をDELETEしてから、送信内容を全部INSERTし直す」入れ替え方式です。画面がその週の全コマを毎回まるごと送信してくるため、DB側も同じ範囲をまるごと入れ替えるのが一番シンプルで、セルを空に戻せばそのコマの取り消しもできます。DELETEとINSERTは`setAutoCommit(false)`〜`commit()`/`rollback()`のJDBCトランザクションで1つにまとめ、途中で失敗しても「消しただけ」の状態にならないようにしています。
+
+重複チェックはアプリ側の事前チェック（分かりやすいエラー表示のため）に加え、最終的にはDBのUNIQUE制約が排他制御の担保になっています（アプリ側のチェックをすり抜けても、DBが確実に拒否する二重の安全策）。
 
 ## フォルダ構成
 
@@ -102,28 +104,43 @@ ScheduleRepository  … DBアクセス（生JDBC）
 attendance-system-java/
 ├── pom.xml
 ├── data/
-│   └── attendance.db          … SQLiteのDBファイル（実行時に読み書きする場所）
+│   └── attendance.db              … SQLiteのDBファイル（起動時に自動生成、Git管理外）
+├── docs/
+│   ├── sample_data.sql            … サンプルデータSQL（手動実行用の控え）
+│   └── images/                    … READMEのスクリーンショット
 ├── src/main/java/com/example/attendance_system_java/
 │   ├── AttendanceSystemJavaApplication.java
 │   ├── DatabaseInitializer.java   … 起動時にテーブル作成・初期データ投入
-│   ├── IndexController.java
-│   ├── RegisterController.java
-│   ├── ListController.java
+│   ├── IndexController.java      … メニュー
+│   │
+│   │  （出欠まわり：登録は3層、他はControllerにSQL直書き）
+│   ├── RegisterController.java / RegisterService.java / RegisterRepository.java
+│   ├── ListController.java / ListRepository.java
 │   ├── MonthlyController.java
 │   ├── SummaryController.java
 │   ├── EditController.java
+│   │
+│   │  （マスタ管理）
 │   ├── ClassController.java
 │   ├── PersonController.java
-│   ├── ScheduleController.java    … スケジュール機能（Controller層）
-│   ├── ScheduleService.java       … スケジュール機能（Service層）
-│   └── ScheduleRepository.java    … スケジュール機能（Repository層）
+│   ├── TeacherController.java / TeacherService.java / TeacherRepository.java
+│   ├── RoomController.java / RoomService.java / RoomRepository.java
+│   │
+│   │  （スケジュール：3層構成）
+│   ├── ScheduleController.java / ScheduleService.java / ScheduleRepository.java
+│   ├── ScheduleCalendarController.java / ScheduleCalendarService.java / ScheduleCalendarRepository.java
+│   │
+│   └── SampleDataController.java / SampleDataService.java  … サンプルデータ投入
 └── src/main/resources/
     ├── application.properties
+    ├── sample_data.sql            … サンプルデータ投入ボタンが読み込むSQL
     ├── static/style.css
     └── templates/
-        ├── index.html, register.html, list.html, monthly.html,
-        │   summary.html, edit.html, class_create.html, classes.html, persons.html
-        └── schedule.html
+        ├── fragments/header.html  … 全ページ共通のナビゲーション
+        ├── index.html, register.html, list.html, monthly.html, summary.html,
+        │   edit.html, class_create.html, classes.html, persons.html,
+        │   teachers.html, rooms.html
+        └── schedule.html, schedule_monthly.html, schedule_monthly_teacher.html
 ```
 
 ## セットアップ
@@ -169,5 +186,4 @@ SQLiteのUNIQUE制約はNULL同士を別物として扱うため、「休み」�
 ## 今後の追加予定
 
 - 出欠一覧のCSV出力（`/list/csv`）
-- 教師・場所マスタの編集画面（現在は初期データ登録のみ、コード上で追加はできるがUIが無い）
 - テストコードの追加

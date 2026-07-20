@@ -108,7 +108,11 @@ public class SummaryController {
 
         if (selectedClassId != null && !selectedClassId.isBlank()) {
 
-            // 期間（開始日・終了日）は指定された時だけWHERE句に足していく
+            // SUM(CASE WHEN 条件 THEN 値 ELSE 0 END) は「条件付き集計」というSQLの定番の書き方。
+            // 例えば academic_attended_hours は「学科の行だけ出席時間を足し、それ以外の行は0を足す」
+            // という意味になり、1回のSQLで総合・学科・実技の3種類の集計を同時に取れる
+            // （学科用・実技用と3回SQLを投げる代わりに、CASEで行を振り分けている）。
+            // 期間（開始日・終了日）は指定された時だけWHERE句に足していく。
             StringBuilder sql = new StringBuilder("""
                     SELECT
                         p.attendance_no,

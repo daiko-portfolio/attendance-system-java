@@ -74,6 +74,11 @@
                 <span th:text="${row.attendedHours} + 'h'"></span>
             </td>
 
+            <!--
+              出欠登録画面（register.html）と同じ仕組みで、ラジオボタンのname属性を
+              "attended_hours_生徒ID" という動的な名前にし、全員分を1フォームで送信する。
+              こちらは登録済みデータの編集なので、保存されている出席時間をそのまま初期選択にする。
+            -->
             <td>
                 <label class="radio-btn radio-present">
                     <input type="radio" th:name="${'attended_hours_' + row.personId}" value="3" th:checked="${row.attendedHours == 3}">

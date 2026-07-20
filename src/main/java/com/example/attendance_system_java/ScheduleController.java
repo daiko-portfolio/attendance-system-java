@@ -359,8 +359,18 @@ public class ScheduleController {
         }
 
         // 業務チェック＋登録（重複があれば全体が登録されない）
-        // ここから先の判断はすべてScheduleServiceに任せる
-        ScheduleService.RegisterResult result = scheduleService.registerWeek(entries);
+        // ここから先の判断はすべてScheduleServiceに任せる。
+        // 登録は「対象週×対象クラスの範囲を消して入れ直す」方式のため、
+        // 消す範囲を正しく指定できるよう、クラスID一覧と週の開始日・終了日も一緒に渡す
+        List<Long> classIds = new ArrayList<>();
+        for (ScheduleRepository.ClassInfo classInfo : classes) {
+            classIds.add(classInfo.classId());
+        }
+
+        String weekStart = monday.toString();
+        String weekEnd = monday.plusDays(6).toString();
+
+        ScheduleService.RegisterResult result = scheduleService.registerWeek(entries, classIds, weekStart, weekEnd);
 
         if (!result.isSuccess()) {
             return renderWithErrors(model, weekValue, rows, classes, allParams,

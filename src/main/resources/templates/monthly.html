@@ -72,6 +72,11 @@
         <th>出席番号</th>
         <th>名前</th>
 
+        <!--
+          列見出し（8/3 AM、8/3 PM…）はController側で組み立てたslotsのリストをそのまま並べる。
+          この後の各生徒の行（row.cells）も同じslotsの順番でセルが作られているので、
+          「N番目の見出し」と「N番目のセル」が必ず同じコマを指すようになっている。
+        -->
         <th th:each="slot : ${slots}">
             <span th:text="${slot.dateLabel}"></span><br>
             <span th:text="${slot.checkLabel}"></span>
@@ -86,6 +91,7 @@
         <td th:text="${row.attendanceNo}"></td>
         <td th:text="${row.name}"></td>
 
+        <!-- セルの背景色はJava側（Cell.statusClass()）で判定済みのCSSクラス名を参照するだけ -->
         <td
             th:each="cell : ${row.cells}"
             th:class="${cell.statusClass()}"

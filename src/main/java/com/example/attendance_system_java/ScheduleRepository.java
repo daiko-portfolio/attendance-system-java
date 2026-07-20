@@ -205,136 +205,111 @@ public class ScheduleRepository {
         );
     }
 
-    // ---- 重複チェック系 ----
-    // ここで数えている件数は、あくまで「登録前に画面へ分かりやすいエラーを出すための事前チェック」。
-    // 最終的な排他制御はDBのUNIQUE制約が担っているので、
-    // 仮にこのチェックをすり抜けてもUPSERT時にDBが弾いてくれる（二重の安全策）。
-
-    /**
-     * 同じ日・同じ区分で、自クラス以外に同じ教師が登録済みかを数える
-     */
-    public int countTeacherConflict(long teacherId, String scheduleDate, int checkNo, long excludeClassId) {
-        String sql = """
-                SELECT COUNT(*)
-                FROM schedules
-                WHERE teacher_id = ?
-                AND schedule_date = ?
-                AND check_no = ?
-                AND class_id <> ?
-                """;
-
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setLong(1, teacherId);
-            stmt.setString(2, scheduleDate);
-            stmt.setInt(3, checkNo);
-            stmt.setLong(4, excludeClassId);
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt(1);
-                }
-                return 0;
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * 同じ日・同じ区分で、自クラス以外に同じ場所が登録済みかを数える
-     */
-    public int countRoomConflict(long roomId, String scheduleDate, int checkNo, long excludeClassId) {
-        String sql = """
-                SELECT COUNT(*)
-                FROM schedules
-                WHERE room_id = ?
-                AND schedule_date = ?
-                AND check_no = ?
-                AND class_id <> ?
-                """;
-
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setLong(1, roomId);
-            stmt.setString(2, scheduleDate);
-            stmt.setInt(3, checkNo);
-            stmt.setLong(4, excludeClassId);
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt(1);
-                }
-                return 0;
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     // ---- 更新系 ----
 
     /**
-     * スケジュール1コマを登録する。
-     * 同じクラス・日付・区分が既にあれば内容を上書きする（UPSERT）。
-     * ON CONFLICT (...) DO UPDATE SET ... はSQLiteのUPSERT構文で、
-     * 「INSERTしようとして重複したら、代わりにUPDATEする」という意味。
-     * excluded.status のようにexcluded.をつけると「今回INSERTしようとしていた値」を指せる。
+     * 1週間分のスケジュールを「消してから入れ直す」方式でまとめて登録する。
      *
-     * teacherId / roomId はJavaの Long（オブジェクト型）なので、値がnullの場合がある
-     * （「休み」の行）。PreparedStatement.setLong()はnullを渡せないため、
-     * nullの時だけsetNull()を使い分けている。
+     * ■ なぜDELETE→INSERTなのか
+     * 画面は「その週×対象クラスの全コマ」を毎回まるごと送信してくるので、
+     * DB側もその範囲をまるごと入れ替えるのが一番単純で、画面と食い違わない。
+     * 1コマずつUPSERTする方式だと、DBに残っている古い行（この送信で上書きされる予定の行）が
+     * 重複チェックに引っかかり、「教師を別クラスへ付け替える」操作が誤って拒否される問題があった。
+     *
+     * ■ トランザクションについて（重要）
+     * DELETEした後にINSERTが失敗すると「消しただけ」の状態になってしまうため、
+     * 全体を1つのトランザクションにする必要がある。
+     * JDBCの接続は普通、1文ごとに自動確定（オートコミット）されるので、
+     * setAutoCommit(false) で自動確定を止めてから実行し、
+     * 全部成功したら commit()、途中で失敗したら rollback() で巻き戻す。
+     * （C#のADO.NETで言う SqlTransaction を使った書き方に相当。
+     * 　Springの@Transactionalはこのプロジェクトのような「自分でgetConnection()する生JDBC」には
+     * 　効かないため、トランザクションもJDBCの機能で明示的に書いている）
+     *
+     * 途中でUNIQUE制約違反（フォーム外のクラスとの教師・場所の衝突など）が起きた場合も、
+     * rollbackによってDELETE分も含めて全部取り消され、DBは登録前の状態のまま残る。
      */
-    public void upsertSchedule(
-            long classId,
-            String scheduleDate,
-            int checkNo,
-            String status,
-            String lessonType,
-            Long teacherId,
-            Long roomId,
-            String memo
+    public void replaceWeekSchedules(
+            List<Long> classIds,
+            String startDate,
+            String endDate,
+            List<ScheduleRow> rows
     ) {
-        String sql = """
+        // クラスIDの数だけ ? を並べたIN句を組み立てる（例: class_id IN (?, ?, ?)）
+        StringBuilder deleteSql = new StringBuilder("""
+                DELETE FROM schedules
+                WHERE schedule_date >= ?
+                AND schedule_date <= ?
+                AND class_id IN (
+                """);
+        for (int i = 0; i < classIds.size(); i++) {
+            if (i > 0) {
+                deleteSql.append(", ");
+            }
+            deleteSql.append("?");
+        }
+        deleteSql.append(")");
+
+        String insertSql = """
                 INSERT INTO schedules (
                     class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT (class_id, schedule_date, check_no)
-                DO UPDATE SET
-                    status = excluded.status,
-                    lesson_type = excluded.lesson_type,
-                    teacher_id = excluded.teacher_id,
-                    room_id = excluded.room_id,
-                    memo = excluded.memo
                 """;
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+        try (Connection conn = dataSource.getConnection()) {
 
-            stmt.setLong(1, classId);
-            stmt.setString(2, scheduleDate);
-            stmt.setInt(3, checkNo);
-            stmt.setString(4, status);
-            stmt.setString(5, lessonType);
+            // ここからトランザクション開始（1文ごとの自動確定を止める）
+            conn.setAutoCommit(false);
 
-            if (teacherId == null) {
-                stmt.setNull(6, java.sql.Types.INTEGER);
-            } else {
-                stmt.setLong(6, teacherId);
+            try {
+                // 1. 対象週×対象クラスの既存行をまとめて削除する
+                try (PreparedStatement stmt = conn.prepareStatement(deleteSql.toString())) {
+                    stmt.setString(1, startDate);
+                    stmt.setString(2, endDate);
+                    for (int i = 0; i < classIds.size(); i++) {
+                        stmt.setLong(3 + i, classIds.get(i));
+                    }
+                    stmt.executeUpdate();
+                }
+
+                // 2. 今回の内容を1コマずつINSERTする。
+                //    teacherId / roomId はLong（オブジェクト型）なのでnullがありうる（「休み」の行）。
+                //    setLong()はnullを渡せないため、nullの時だけsetNull()を使い分けている。
+                try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+                    for (ScheduleRow row : rows) {
+                        stmt.setLong(1, row.classId());
+                        stmt.setString(2, row.scheduleDate());
+                        stmt.setInt(3, row.checkNo());
+                        stmt.setString(4, row.status());
+                        stmt.setString(5, row.lessonType());
+
+                        if (row.teacherId() == null) {
+                            stmt.setNull(6, java.sql.Types.INTEGER);
+                        } else {
+                            stmt.setLong(6, row.teacherId());
+                        }
+
+                        if (row.roomId() == null) {
+                            stmt.setNull(7, java.sql.Types.INTEGER);
+                        } else {
+                            stmt.setLong(7, row.roomId());
+                        }
+
+                        stmt.setString(8, row.memo());
+
+                        stmt.executeUpdate();
+                    }
+                }
+
+                // 3. ここまで全部成功したら確定
+                conn.commit();
+
+            } catch (SQLException e) {
+                // 途中で失敗したら、DELETEした分も含めて全部巻き戻す
+                conn.rollback();
+                throw new RuntimeException(e);
             }
-
-            if (roomId == null) {
-                stmt.setNull(7, java.sql.Types.INTEGER);
-            } else {
-                stmt.setLong(7, roomId);
-            }
-
-            stmt.setString(8, memo);
-
-            stmt.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }

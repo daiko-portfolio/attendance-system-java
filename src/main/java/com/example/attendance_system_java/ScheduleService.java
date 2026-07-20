@@ -1,7 +1,6 @@
 package com.example.attendance_system_java;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,6 +12,16 @@ import java.util.Set;
 /**
  * スケジュール登録の業務ロジック層。
  * HTTP（画面）のことは知らず、Controllerから渡された業務データだけを扱う。
+ *
+ * ■ 登録の方式：消してから入れ直す（DELETE→INSERT）
+ * 画面はその週×対象クラスの全コマを毎回まるごと送信してくるため、
+ * DB側も「対象週×対象クラスの範囲を全部消して、送られてきた内容を全部入れる」
+ * という入れ替え方式にしている。これにより
+ *   ・DBに残った古い行と照合する2回目のチェックが不要になる
+ *   ・「教師を別クラスへ付け替える」操作が1回の登録で済む
+ *   ・セルを空に戻して登録すれば、そのコマの登録を取り消せる
+ * というシンプルな動きになる。入れ替えの途中で失敗した時に「消しただけ」の状態に
+ * ならないよう、DELETEとINSERTはRepository側で1つのトランザクションとして実行される。
  *
  * ■ Spring Boot初心者向けメモ
  * ・@Service は @Component の仲間で、「このクラスは業務ロジック担当ですよ」という
@@ -80,18 +89,19 @@ public class ScheduleService {
 
     /**
      * 1週間分のスケジュールを一括登録する。
-     * 重複が1件でもあれば全体を登録しない（トランザクションで巻き戻す）。
+     * 重複が1件でもあれば全体を登録しない。
      *
-     * ■ @Transactional について
-     * このメソッドの中で複数回 upsertSchedule()（=複数回のSQL実行）を行っているが、
-     * @Transactional を付けることで「このメソッド全体を1つの取引（トランザクション）」として扱う。
-     * もし途中の1件でエラー（例外）が発生すると、それより前に実行した分のSQLもまとめて
-     * 取り消され（ロールバック）、DBには何も反映されない。
-     * これにより「14コマ中13コマは登録できたが1コマだけ失敗した」という
-     * 中途半端な状態を防いでいる（今回のユーザー要望「①週全体を巻き戻す」の実現方法）。
+     * @param entries   登録する全コマ（休みのコマ含む。教師・場所とも未選択のコマは含まれない）
+     * @param classIds  今回の登録対象クラスのID一覧（入れ替えでDELETEする範囲の指定に使う）
+     * @param weekStart 対象週の月曜日（yyyy-MM-dd）
+     * @param weekEnd   対象週の日曜日（yyyy-MM-dd）
      */
-    @Transactional
-    public RegisterResult registerWeek(List<CellEntry> entries) {
+    public RegisterResult registerWeek(
+            List<CellEntry> entries,
+            List<Long> classIds,
+            String weekStart,
+            String weekEnd
+    ) {
 
         List<String> errorMessages = new ArrayList<>();
         Set<String> conflictCells = new HashSet<>();
@@ -109,11 +119,16 @@ public class ScheduleService {
             roomNames.put(room.roomId(), room.roomName());
         }
 
-        // ---- チェック1: 送信フォーム内での重複 ----
-        // 「今回送られてきた14コマ×クラス数」の中だけで見て、
-        // 同じ教師・同じ場所が「同じ日付・同じ区分」に2回以上登場していないかを調べる。
+        // ---- 重複チェック：送信フォーム内での二重登場 ----
+        // 「今回送られてきた全コマ」の中で、同じ教師・同じ場所が
+        // 「同じ日付・同じ区分」に2回以上登場していないかを調べる。
         // 「教師ID_日付_区分」というキー文字列を作り、Mapに既に同じキーがあれば重複、
         // という仕組みで判定している（DBに問い合わせなくても分かるチェック）。
+        //
+        // DBに保存済みのデータとの照合はここでは行わない。対象範囲はこの後まるごと
+        // 消して入れ直すため、古い行と照合する意味が無いからである。
+        // フォームの範囲外（無効化した旧クラスなど）との衝突だけはこのチェックを
+        // すり抜けるが、そこはDBのUNIQUE制約が拒否し、トランザクションが巻き戻す。
         Map<String, CellEntry> seenTeachers = new HashMap<>();
         Map<String, CellEntry> seenRooms = new HashMap<>();
 
@@ -160,44 +175,6 @@ public class ScheduleService {
             }
         }
 
-        // ---- チェック2: DBに登録済みの他クラスとの重複 ----
-        // チェック1は「今回送信された内容どうし」の重複だったが、
-        // こちらは「以前に登録済みで、既にDBに保存されているスケジュール」との重複を見る。
-        // 例：先週Aクラスの担当を決めた後、今週Bクラスで同じ教師・同じ時間帯を
-        // 割り当てようとした場合はこちらで引っかかる。
-        for (CellEntry entry : entries) {
-
-            if (!entry.status().equals("通常")) {
-                continue;
-            }
-
-            if (entry.teacherId() != null) {
-                int count = scheduleRepository.countTeacherConflict(
-                        entry.teacherId(), entry.scheduleDate(), entry.checkNo(), entry.classId());
-
-                if (count > 0) {
-                    String teacherName = teacherNames.get(entry.teacherId());
-                    errorMessages.add(
-                            entry.dayLabel() + "：" + teacherName + "先生は同じ時間帯に別クラスへ登録済みです"
-                    );
-                    conflictCells.add(entry.cellKey());
-                }
-            }
-
-            if (entry.roomId() != null) {
-                int count = scheduleRepository.countRoomConflict(
-                        entry.roomId(), entry.scheduleDate(), entry.checkNo(), entry.classId());
-
-                if (count > 0) {
-                    String roomName = roomNames.get(entry.roomId());
-                    errorMessages.add(
-                            entry.dayLabel() + "：" + roomName + " は同じ時間帯に別クラスが使用予定です"
-                    );
-                    conflictCells.add(entry.cellKey());
-                }
-            }
-        }
-
         // 重複が1つでもあれば、ここで処理を打ち切って登録を一切行わない
         // （success=false を返すのでControllerはこの週を保存せず、エラー内容だけ画面へ戻す）
         if (!errorMessages.isEmpty()) {
@@ -205,26 +182,28 @@ public class ScheduleService {
         }
 
         // ---- 登録処理 ----
-        // ここまでのチェックを通過した場合のみ実際にINSERT/UPDATEを行う。
-        // 万が一チェックをすり抜けるタイミング差（同時アクセスなど）があっても、
-        // DB側のUNIQUE制約が最終防衛ラインとして例外を投げてくれる。
-        // その例外が発生した場合も、クラス冒頭の @Transactional のおかげで
-        // ここまでにupsertした分を含めて全部ロールバックされる。
+        // CellEntry（画面の事情を含むデータ）を、DB保存用のScheduleRowに詰め替えてから
+        // Repositoryに渡す。「対象週×対象クラスを全部消して、この内容を全部入れる」
+        // という入れ替えは、Repository側で1つのトランザクションとして実行される。
+        List<ScheduleRepository.ScheduleRow> rows = new ArrayList<>();
+
         for (CellEntry entry : entries) {
 
             if (entry.status().equals("休み")) {
                 // 休みでもメモ（休講理由など）は残す
-                scheduleRepository.upsertSchedule(
+                rows.add(new ScheduleRepository.ScheduleRow(
                         entry.classId(), entry.scheduleDate(), entry.checkNo(),
                         "休み", null, null, null, entry.memo()
-                );
+                ));
             } else {
-                scheduleRepository.upsertSchedule(
+                rows.add(new ScheduleRepository.ScheduleRow(
                         entry.classId(), entry.scheduleDate(), entry.checkNo(),
                         "通常", entry.lessonType(), entry.teacherId(), entry.roomId(), entry.memo()
-                );
+                ));
             }
         }
+
+        scheduleRepository.replaceWeekSchedules(classIds, weekStart, weekEnd, rows);
 
         return new RegisterResult(true, errorMessages, conflictCells);
     }

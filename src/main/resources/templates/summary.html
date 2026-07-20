@@ -73,6 +73,10 @@
             率：<span th:text="${row.practicalRate}"></span>%
         </td>
 
+        <!--
+          判定（安全/注意/危険）の色分けは、Java側（SummaryRow.judgeClass()）で
+          判定文字列→CSSクラス名に変換済みのものを、固定文字列 'judge-line ' に連結しているだけ。
+        -->
         <td class="judge-cell">
             <div th:class="'judge-line ' + ${row.judgeClass(row.totalJudge)}">
                 総合：<span th:text="${row.totalJudge}"></span>
