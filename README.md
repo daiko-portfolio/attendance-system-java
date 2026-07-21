@@ -86,7 +86,7 @@
 
 DBアクセスは全画面とも生JDBC（`Connection`/`PreparedStatement`/`ResultSet`のtry-with-resources）に統一しています。C#のADO.NET（`SqlConnection`/`SqlCommand`/`SqlDataReader`）とほぼ1対1で対応する書き方で、ORMやJdbcTemplateに頼らず接続の取得からクローズまでを自分で書き、DBアクセスの仕組みを隠さないことを優先しました（例外はDDL実行だけの`DatabaseInitializer`と、SQLファイルを流すだけの`SampleDataService`。この2つは単純なSQL実行の繰り返しなのでJdbcTemplateのままです）。
 
-層構成は、業務判断（重複チェックなどの分岐）がある機能はController / Service / Repositoryの3層、業務判断のない単純な検索・登録の画面はControllerにSQLを直接書くシンプルな構成、と画面の性質で使い分けています。
+層構成は画面によってばらつきがあります。`Register`/`Schedule`/`ScheduleCalendar`/`Teacher`/`Room`はController / Service / Repositoryの3層、`List`はController / Repository、`Class`/`Person`/`Edit`/`Monthly`/`Summary`はControllerにSQLを直接書く構成です。3層化は現在進行中で、[今後の追加予定](#今後の追加予定)にも入れています。
 
 ```
 ScheduleController  … HTTPの受け取り、フォーム⇔業務データの変換、画面表示
@@ -185,5 +185,8 @@ SQLiteのUNIQUE制約はNULL同士を別物として扱うため、「休み」�
 
 ## 今後の追加予定
 
+- `Class`/`Person`/`Edit`/`Monthly`/`Summary`のController / Service / Repositoryへの3層化
+- ログイン機能
+- スケジュール登録画面：行単位での一括「休み」設定（JavaScriptでの即時反映）
 - 出欠一覧のCSV出力（`/list/csv`）
 - テストコードの追加
