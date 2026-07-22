@@ -106,8 +106,7 @@ attendance-system-java/
 ├── data/
 │   └── attendance.db              … SQLiteのDBファイル（起動時に自動生成、Git管理外）
 ├── docs/
-│   ├── sample_data.sql            … サンプルデータSQL（手動実行用の控え）
-│   └── images/                    … READMEのスクリーンショット
+│   └── images/                    … READMEのスクリーンショット・ER図
 ├── src/main/java/com/example/attendance_system_java/
 │   ├── AttendanceSystemJavaApplication.java
 │   ├── DatabaseInitializer.java   … 起動時にテーブル作成・初期データ投入
@@ -163,6 +162,8 @@ cd JAVA_attendance_system\attendance-system-java
 ## DB概要
 
 DBはSQLiteの `data/attendance.db` です。起動時（`DatabaseInitializer`）に、無ければテーブルを自動作成します。
+
+![ER図](docs/images/database-schema.png)
 
 | テーブル | 内容 |
 |---|---|
