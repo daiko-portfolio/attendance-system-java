@@ -30,11 +30,11 @@ import java.util.Set;
  *   3層に分けるのがSpring Bootの定番の構成。
  */
 @Service
-public class ScheduleService {
+public class ScheduleRegisterService {
 
-    private final ScheduleRepository scheduleRepository;
+    private final ScheduleRegisterRepository scheduleRepository;
 
-    public ScheduleService(ScheduleRepository scheduleRepository) {
+    public ScheduleRegisterService(ScheduleRegisterRepository scheduleRepository) {
         this.scheduleRepository = scheduleRepository;
     }
 
@@ -110,12 +110,12 @@ public class ScheduleService {
         // （IDだけだとエラーメッセージが「教師ID:2が重複」のようになり分かりにくいため、
         //   先に teacherId -> teacherName の対応表を作っておく）
         Map<Long, String> teacherNames = new HashMap<>();
-        for (ScheduleRepository.Teacher teacher : scheduleRepository.findActiveTeachers()) {
+        for (ScheduleRegisterRepository.Teacher teacher : scheduleRepository.findActiveTeachers()) {
             teacherNames.put(teacher.teacherId(), teacher.teacherName());
         }
 
         Map<Long, String> roomNames = new HashMap<>();
-        for (ScheduleRepository.Room room : scheduleRepository.findActiveRooms()) {
+        for (ScheduleRegisterRepository.Room room : scheduleRepository.findActiveRooms()) {
             roomNames.put(room.roomId(), room.roomName());
         }
 
@@ -185,18 +185,18 @@ public class ScheduleService {
         // CellEntry（画面の事情を含むデータ）を、DB保存用のScheduleRowに詰め替えてから
         // Repositoryに渡す。「対象週×対象クラスを全部消して、この内容を全部入れる」
         // という入れ替えは、Repository側で1つのトランザクションとして実行される。
-        List<ScheduleRepository.ScheduleRow> rows = new ArrayList<>();
+        List<ScheduleRegisterRepository.ScheduleRow> rows = new ArrayList<>();
 
         for (CellEntry entry : entries) {
 
             if (entry.status().equals("休み")) {
                 // 休みでもメモ（休講理由など）は残す
-                rows.add(new ScheduleRepository.ScheduleRow(
+                rows.add(new ScheduleRegisterRepository.ScheduleRow(
                         entry.classId(), entry.scheduleDate(), entry.checkNo(),
                         "休み", null, null, null, entry.memo()
                 ));
             } else {
-                rows.add(new ScheduleRepository.ScheduleRow(
+                rows.add(new ScheduleRegisterRepository.ScheduleRow(
                         entry.classId(), entry.scheduleDate(), entry.checkNo(),
                         "通常", entry.lessonType(), entry.teacherId(), entry.roomId(), entry.memo()
                 ));

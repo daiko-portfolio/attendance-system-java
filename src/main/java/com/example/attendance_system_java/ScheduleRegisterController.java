@@ -20,7 +20,7 @@ import java.util.Set;
 /**
  * 週次スケジュール登録画面のController。
  * HTTPパラメータの受け取り・画面用データの組み立てだけを行い、
- * 業務判断（重複チェックや登録可否）はScheduleServiceに任せる。
+ * 業務判断（重複チェックや登録可否）はScheduleRegisterServiceに任せる。
  *
  * ■ Spring Boot初心者向けメモ（Controller全般の基礎）
  * ・@Controller は「このクラスは画面を返すControllerですよ」という目印。
@@ -44,12 +44,12 @@ import java.util.Set;
  *   （このクラスでは登録成功メッセージを渡すのに使っている）。
  */
 @Controller
-public class ScheduleController {
+public class ScheduleRegisterController {
 
-    private final ScheduleRepository scheduleRepository;
-    private final ScheduleService scheduleService;
+    private final ScheduleRegisterRepository scheduleRepository;
+    private final ScheduleRegisterService scheduleService;
 
-    public ScheduleController(ScheduleRepository scheduleRepository, ScheduleService scheduleService) {
+    public ScheduleRegisterController(ScheduleRegisterRepository scheduleRepository, ScheduleRegisterService scheduleService) {
         this.scheduleRepository = scheduleRepository;
         this.scheduleService = scheduleService;
     }
@@ -157,7 +157,7 @@ public class ScheduleController {
 
         LocalDate monday = parseWeekToMonday(weekValue);
         List<RowInfo> rows = buildRows(monday);
-        List<ScheduleRepository.ClassInfo> classes = scheduleRepository.findActiveClasses();
+        List<ScheduleRegisterRepository.ClassInfo> classes = scheduleRepository.findActiveClasses();
 
         // 初期値を組み立てる（DB登録済み > デフォルト値 の優先順）
         Map<String, String> formValues = buildFormValues(monday, rows, classes);
@@ -190,27 +190,27 @@ public class ScheduleController {
     private Map<String, String> buildFormValues(
             LocalDate monday,
             List<RowInfo> rows,
-            List<ScheduleRepository.ClassInfo> classes
+            List<ScheduleRegisterRepository.ClassInfo> classes
     ) {
         Map<String, String> formValues = new HashMap<>();
 
         // 登録済みスケジュールを「classId_日付_区分」で引けるようにする
         String startDate = monday.toString();
         String endDate = monday.plusDays(6).toString();
-        List<ScheduleRepository.ScheduleRow> saved = scheduleRepository.findSchedulesBetween(startDate, endDate);
+        List<ScheduleRegisterRepository.ScheduleRow> saved = scheduleRepository.findSchedulesBetween(startDate, endDate);
 
         // DBから取ってきたList（順番に並んだ一覧）のままだと、
         // 「このクラス・この日・この区分の行はどれ？」を探すのに毎回全件ループが必要になる。
         // そこで先に「classId_日付_区分」というキー文字列 -> その行、というMapに詰め替えておくことで、
         // 後のループの中で savedMap.get(key) と一発で引けるようにしている（探索の高速化）。
-        Map<String, ScheduleRepository.ScheduleRow> savedMap = new HashMap<>();
-        for (ScheduleRepository.ScheduleRow row : saved) {
+        Map<String, ScheduleRegisterRepository.ScheduleRow> savedMap = new HashMap<>();
+        for (ScheduleRegisterRepository.ScheduleRow row : saved) {
             String key = row.classId() + "_" + row.scheduleDate() + "_" + row.checkNo();
             savedMap.put(key, row);
         }
 
         // クラス × 曜日 × 午前午後 のすべての組み合わせ（=画面の全セル分）をループする
-        for (ScheduleRepository.ClassInfo classInfo : classes) {
+        for (ScheduleRegisterRepository.ClassInfo classInfo : classes) {
             for (RowInfo row : rows) {
 
                 // suffix は画面のinput/selectのname属性の後半部分と一致させる文字列
@@ -220,7 +220,7 @@ public class ScheduleController {
                 // dayIndexではなくrow.dateStr()を使った別のキーを組み立てる
                 String savedKey = classInfo.classId() + "_" + row.dateStr() + "_" + row.checkNo();
 
-                ScheduleRepository.ScheduleRow savedRow = savedMap.get(savedKey);
+                ScheduleRegisterRepository.ScheduleRow savedRow = savedMap.get(savedKey);
 
                 if (savedRow != null) {
                     // DB登録済みの内容を初期値にする
@@ -296,17 +296,17 @@ public class ScheduleController {
 
         LocalDate monday = parseWeekToMonday(weekValue);
         List<RowInfo> rows = buildRows(monday);
-        List<ScheduleRepository.ClassInfo> classes = scheduleRepository.findActiveClasses();
+        List<ScheduleRegisterRepository.ClassInfo> classes = scheduleRepository.findActiveClasses();
 
         // フォーム内容を業務データ（CellEntry）へ変換する
         // ここが「Web（allParamsという生のフォームデータ）」から
         // 「業務データ（CellEntryという意味の分かる形）」への変換ポイントで、
-        // これより先（ScheduleServiceの中）はHTTPやフォームのことを一切気にしなくてよくなる
-        List<ScheduleService.CellEntry> entries = new ArrayList<>();
+        // これより先（ScheduleRegisterServiceの中）はHTTPやフォームのことを一切気にしなくてよくなる
+        List<ScheduleRegisterService.CellEntry> entries = new ArrayList<>();
         List<String> inputErrors = new ArrayList<>();
         Set<String> inputErrorCells = new HashSet<>();
 
-        for (ScheduleRepository.ClassInfo classInfo : classes) {
+        for (ScheduleRegisterRepository.ClassInfo classInfo : classes) {
             for (RowInfo row : rows) {
 
                 String suffix = classInfo.classId() + "_" + row.dayIndex() + "_" + row.checkNo();
@@ -324,7 +324,7 @@ public class ScheduleController {
                 String memo = allParams.get("memo_" + suffix);
 
                 if (status.equals("休み")) {
-                    entries.add(new ScheduleService.CellEntry(
+                    entries.add(new ScheduleRegisterService.CellEntry(
                             cellKey, classInfo.classId(), classInfo.className(),
                             row.dateStr(), row.checkNo(),
                             "休み", null, null, null, memo, row.label()
@@ -345,7 +345,7 @@ public class ScheduleController {
                     continue;
                 }
 
-                entries.add(new ScheduleService.CellEntry(
+                entries.add(new ScheduleRegisterService.CellEntry(
                         cellKey, classInfo.classId(), classInfo.className(),
                         row.dateStr(), row.checkNo(),
                         "通常", lessonType, teacherId, roomId, memo, row.label()
@@ -359,18 +359,18 @@ public class ScheduleController {
         }
 
         // 業務チェック＋登録（重複があれば全体が登録されない）
-        // ここから先の判断はすべてScheduleServiceに任せる。
+        // ここから先の判断はすべてScheduleRegisterServiceに任せる。
         // 登録は「対象週×対象クラスの範囲を消して入れ直す」方式のため、
         // 消す範囲を正しく指定できるよう、クラスID一覧と週の開始日・終了日も一緒に渡す
         List<Long> classIds = new ArrayList<>();
-        for (ScheduleRepository.ClassInfo classInfo : classes) {
+        for (ScheduleRegisterRepository.ClassInfo classInfo : classes) {
             classIds.add(classInfo.classId());
         }
 
         String weekStart = monday.toString();
         String weekEnd = monday.plusDays(6).toString();
 
-        ScheduleService.RegisterResult result = scheduleService.registerWeek(entries, classIds, weekStart, weekEnd);
+        ScheduleRegisterService.RegisterResult result = scheduleService.registerWeek(entries, classIds, weekStart, weekEnd);
 
         if (!result.isSuccess()) {
             return renderWithErrors(model, weekValue, rows, classes, allParams,
@@ -392,7 +392,7 @@ public class ScheduleController {
             Model model,
             String weekValue,
             List<RowInfo> rows,
-            List<ScheduleRepository.ClassInfo> classes,
+            List<ScheduleRegisterRepository.ClassInfo> classes,
             Map<String, String> allParams,
             List<String> errorMessages,
             Set<String> conflictCells

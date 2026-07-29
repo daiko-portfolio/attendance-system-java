@@ -19,7 +19,7 @@ import java.util.Map;
 
 /**
  * 出欠編集・削除画面のController。
- * RegisterControllerと同様、"attended_hours_<person_id>" という
+ * AttendanceRegisterControllerと同様、"attended_hours_<person_id>" という
  * 動的な名前のパラメータをMapでまとめて受け取って処理する構成。
  *
  * DBアクセスは生JDBC（Connection/PreparedStatement/ResultSet）で書いている。
@@ -27,11 +27,11 @@ import java.util.Map;
  * 呼び出し元にthrowsを伝播させない。
  */
 @Controller
-public class EditController {
+public class AttendanceEditController {
 
     private final DataSource dataSource;
 
-    public EditController(DataSource dataSource) {
+    public AttendanceEditController(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 

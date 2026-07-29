@@ -7,14 +7,14 @@ import java.util.List;
 /**
  * 出欠登録画面の業務ロジック層。
  * 「出席時間から出席/欠席を判定する」という業務判断だけをここで行い、
- * DBへの実際の保存はRegisterRepositoryに任せる。
+ * DBへの実際の保存はAttendanceRegisterRepositoryに任せる。
  */
 @Service
-public class RegisterService {
+public class AttendanceRegisterService {
 
-    private final RegisterRepository registerRepository;
+    private final AttendanceRegisterRepository registerRepository;
 
-    public RegisterService(RegisterRepository registerRepository) {
+    public AttendanceRegisterService(AttendanceRegisterRepository registerRepository) {
         this.registerRepository = registerRepository;
     }
 

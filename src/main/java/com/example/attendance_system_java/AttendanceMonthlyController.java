@@ -39,11 +39,11 @@ import java.util.Map;
  * 呼び出し元にthrowsを伝播させない。
  */
 @Controller
-public class MonthlyController {
+public class AttendanceMonthlyController {
 
     private final DataSource dataSource;
 
-    public MonthlyController(DataSource dataSource) {
+    public AttendanceMonthlyController(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 

@@ -11,14 +11,14 @@ import java.util.List;
 /**
  * 出欠一覧画面のController。
  * この画面には業務判断が無い（検索条件で絞り込んで表示するだけ）ため、
- * Serviceを挟まずController→ListRepository直結にしている。
+ * Serviceを挟まずController→AttendanceListRepository直結にしている。
  */
 @Controller
-public class ListController {
+public class AttendanceListController {
 
-    private final ListRepository listRepository;
+    private final AttendanceListRepository listRepository;
 
-    public ListController(ListRepository listRepository) {
+    public AttendanceListController(AttendanceListRepository listRepository) {
         this.listRepository = listRepository;
     }
 
@@ -34,8 +34,8 @@ public class ListController {
             searchDate = LocalDate.now().toString();
         }
 
-        List<ListRepository.ClassOption> classes = listRepository.findActiveClasses();
-        List<ListRepository.AttendanceRow> rows = listRepository.findAttendanceRows(searchDate, selectedClassId, searchName);
+        List<AttendanceListRepository.ClassOption> classes = listRepository.findActiveClasses();
+        List<AttendanceListRepository.AttendanceRow> rows = listRepository.findAttendanceRows(searchDate, selectedClassId, searchName);
 
         model.addAttribute("rows", rows);
         model.addAttribute("classes", classes);

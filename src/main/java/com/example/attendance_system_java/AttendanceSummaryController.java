@@ -23,11 +23,11 @@ import java.util.List;
  * 呼び出し元にthrowsを伝播させない。
  */
 @Controller
-public class SummaryController {
+public class AttendanceSummaryController {
 
     private final DataSource dataSource;
 
-    public SummaryController(DataSource dataSource) {
+    public AttendanceSummaryController(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 

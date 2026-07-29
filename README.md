@@ -86,12 +86,14 @@
 
 DBアクセスは全画面とも生JDBC（`Connection`/`PreparedStatement`/`ResultSet`のtry-with-resources）に統一しています。C#のADO.NET（`SqlConnection`/`SqlCommand`/`SqlDataReader`）とほぼ1対1で対応する書き方で、ORMやJdbcTemplateに頼らず接続の取得からクローズまでを自分で書き、DBアクセスの仕組みを隠さないことを優先しました（例外はDDL実行だけの`DatabaseInitializer`と、SQLファイルを流すだけの`SampleDataService`。この2つは単純なSQL実行の繰り返しなのでJdbcTemplateのままです）。
 
-層構成は画面によってばらつきがあります。`Register`/`Schedule`/`ScheduleCalendar`/`Teacher`/`Room`はController / Service / Repositoryの3層、`List`はController / Repository、`Class`/`Person`/`Edit`/`Monthly`/`Summary`はControllerにSQLを直接書く構成です。3層化は現在進行中で、[今後の追加予定](#今後の追加予定)にも入れています。
+層構成は画面によってばらつきがあります。`AttendanceRegister`/`ScheduleRegister`/`ScheduleCalendar`/`Teacher`/`Room`はController / Service / Repositoryの3層、`AttendanceList`はController / Repository、`Class`/`Person`/`AttendanceEdit`/`AttendanceMonthly`/`AttendanceSummary`はControllerにSQLを直接書く構成です。3層化は現在進行中で、[今後の追加予定](#今後の追加予定)にも入れています。
+
+クラス名は「画面の機能＋役割」が分かるように、出欠まわりは`Attendance`、スケジュール登録は`ScheduleRegister`を頭に付けています（月次カレンダー閲覧の`ScheduleCalendar`と、週単位登録の`ScheduleRegister`を区別するため）。
 
 ```
-ScheduleController  … HTTPの受け取り、フォーム⇔業務データの変換、画面表示
-ScheduleService     … 業務ロジック（教師・場所の重複チェック）
-ScheduleRepository  … DBアクセス（生JDBC。週の入れ替えをJDBCのトランザクションで実行）
+ScheduleRegisterController  … HTTPの受け取り、フォーム⇔業務データの変換、画面表示
+ScheduleRegisterService     … 業務ロジック（教師・場所の重複チェック）
+ScheduleRegisterRepository  … DBアクセス（生JDBC。週の入れ替えをJDBCのトランザクションで実行）
 ```
 
 スケジュールの登録は「対象週×対象クラスの範囲をDELETEしてから、送信内容を全部INSERTし直す」入れ替え方式です。画面がその週の全コマを毎回まるごと送信してくるため、DB側も同じ範囲をまるごと入れ替えるのが一番シンプルで、セルを空に戻せばそのコマの取り消しもできます。DELETEとINSERTは`setAutoCommit(false)`〜`commit()`/`rollback()`のJDBCトランザクションで1つにまとめ、途中で失敗しても「消しただけ」の状態にならないようにしています。
@@ -113,11 +115,11 @@ attendance-system-java/
 │   ├── IndexController.java      … メニュー
 │   │
 │   │  （出欠まわり：登録は3層、他はControllerにSQL直書き）
-│   ├── RegisterController.java / RegisterService.java / RegisterRepository.java
-│   ├── ListController.java / ListRepository.java
-│   ├── MonthlyController.java
-│   ├── SummaryController.java
-│   ├── EditController.java
+│   ├── AttendanceRegisterController.java / AttendanceRegisterService.java / AttendanceRegisterRepository.java
+│   ├── AttendanceListController.java / AttendanceListRepository.java
+│   ├── AttendanceMonthlyController.java
+│   ├── AttendanceSummaryController.java
+│   ├── AttendanceEditController.java
 │   │
 │   │  （マスタ管理）
 │   ├── ClassController.java
@@ -126,7 +128,7 @@ attendance-system-java/
 │   ├── RoomController.java / RoomService.java / RoomRepository.java
 │   │
 │   │  （スケジュール：3層構成）
-│   ├── ScheduleController.java / ScheduleService.java / ScheduleRepository.java
+│   ├── ScheduleRegisterController.java / ScheduleRegisterService.java / ScheduleRegisterRepository.java
 │   ├── ScheduleCalendarController.java / ScheduleCalendarService.java / ScheduleCalendarRepository.java
 │   │
 │   └── SampleDataController.java / SampleDataService.java  … サンプルデータ投入
@@ -186,7 +188,7 @@ SQLiteのUNIQUE制約はNULL同士を別物として扱うため、「休み」�
 
 ## 今後の追加予定
 
-- `Class`/`Person`/`Edit`/`Monthly`/`Summary`のController / Service / Repositoryへの3層化
+- `Class`/`Person`/`AttendanceEdit`/`AttendanceMonthly`/`AttendanceSummary`のController / Service / Repositoryへの3層化
 - ログイン機能
 - スケジュール登録画面：行単位での一括「休み」設定（JavaScriptでの即時反映）
 - 出欠一覧のCSV出力（`/list/csv`）

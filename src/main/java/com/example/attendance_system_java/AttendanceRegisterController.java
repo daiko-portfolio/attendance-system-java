@@ -19,22 +19,22 @@ import java.util.Map;
  * 3層構成（Controller / Service / Repository）に分けた最初の画面。
  *
  * ・単純な一覧取得（教室一覧、生徒一覧、登録済み出席時間）は
- *   業務判断が無いので、Controllerから直接RegisterRepositoryを呼んでいる。
+ *   業務判断が無いので、Controllerから直接AttendanceRegisterRepositoryを呼んでいる。
  * ・「出席時間から出席/欠席を判定して保存する」という業務ロジックは
- *   RegisterServiceに任せている。
+ *   AttendanceRegisterServiceに任せている。
  *
- * SQLException（チェック例外）はRegisterRepository側でキャッチしてRuntimeException（実行時例外）に
+ * SQLException（チェック例外）はAttendanceRegisterRepository側でキャッチしてRuntimeException（実行時例外）に
  * 変換しているため、このControllerはthrowsを書かずに済んでいる。
  * RuntimeExceptionは投げる場所を宣言する必要が無い例外の種類で、
  * ここで何もしなくても、エラーが起きればSpring Bootの標準エラー画面が表示される。
  */
 @Controller
-public class RegisterController {
+public class AttendanceRegisterController {
 
-    private final RegisterRepository registerRepository;
-    private final RegisterService registerService;
+    private final AttendanceRegisterRepository registerRepository;
+    private final AttendanceRegisterService registerService;
 
-    public RegisterController(RegisterRepository registerRepository, RegisterService registerService) {
+    public AttendanceRegisterController(AttendanceRegisterRepository registerRepository, AttendanceRegisterService registerService) {
         this.registerRepository = registerRepository;
         this.registerService = registerService;
     }
@@ -66,20 +66,20 @@ public class RegisterController {
             selectedLessonType = "学科";
         }
 
-        List<RegisterRepository.ClassOption> classes = registerRepository.findActiveClasses();
+        List<AttendanceRegisterRepository.ClassOption> classes = registerRepository.findActiveClasses();
 
-        List<RegisterRepository.PersonOption> persons = List.of();
+        List<AttendanceRegisterRepository.PersonOption> persons = List.of();
         String className = null;
         // person_id -> 登録済みの出席時間（3/2/1/0）。ラジオボタンの初期選択に使う
         Map<Long, Integer> currentHours = new HashMap<>();
         // その日の授業スケジュール（未登録ならnullのまま）
-        RegisterRepository.ScheduleInfo scheduleInfo = null;
+        AttendanceRegisterRepository.ScheduleInfo scheduleInfo = null;
 
         if (selectedClassId != null && !selectedClassId.isBlank()) {
 
             persons = registerRepository.findPersonsByClassId(selectedClassId);
 
-            for (RegisterRepository.ClassOption c : classes) {
+            for (AttendanceRegisterRepository.ClassOption c : classes) {
                 if (String.valueOf(c.classId()).equals(selectedClassId)) {
                     className = c.className();
                     break;
@@ -133,7 +133,7 @@ public class RegisterController {
 
         // フォームの全パラメータの中から "attended_hours_" で始まるものだけを拾い、
         // 残りの文字列（person_id）を取り出してServiceに渡すDTOのListを組み立てる
-        List<RegisterService.PersonHours> entries = new ArrayList<>();
+        List<AttendanceRegisterService.PersonHours> entries = new ArrayList<>();
 
         for (Map.Entry<String, String> entry : allParams.entrySet()) {
             String key = entry.getKey();
@@ -143,7 +143,7 @@ public class RegisterController {
                 long personId = Long.parseLong(personIdText);
                 int attendedHours = Integer.parseInt(entry.getValue());
 
-                entries.add(new RegisterService.PersonHours(personId, attendedHours));
+                entries.add(new AttendanceRegisterService.PersonHours(personId, attendedHours));
             }
         }
 

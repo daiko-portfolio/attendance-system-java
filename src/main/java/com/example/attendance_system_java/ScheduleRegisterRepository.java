@@ -24,11 +24,11 @@ import java.util.List;
  * 呼び出し元（Service/Controller）にthrowsを伝播させない。
  */
 @Repository
-public class ScheduleRepository {
+public class ScheduleRegisterRepository {
 
     private final DataSource dataSource;
 
-    public ScheduleRepository(DataSource dataSource) {
+    public ScheduleRegisterRepository(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 

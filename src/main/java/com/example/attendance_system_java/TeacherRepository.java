@@ -12,7 +12,7 @@ import java.util.List;
 
 /**
  * 教師マスタのDBアクセス層。生JDBC（Connection/PreparedStatement/ResultSet）で書いている。
- * （スケジュール表示用の findActiveTeachers は ScheduleRepository 側にもあるが、
+ * （スケジュール表示用の findActiveTeachers は ScheduleRegisterRepository 側にもあるが、
  *   あちらは「有効な教師だけ」を取る参照専用。こちらは管理画面用に
  *   無効な教師も含めた一覧取得・追加・更新を担当する）
  *

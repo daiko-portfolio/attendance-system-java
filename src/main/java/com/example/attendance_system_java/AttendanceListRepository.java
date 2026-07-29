@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 出欠一覧画面のDBアクセス層。生JDBCで書いている（RegisterRepositoryと同じ方針）。
+ * 出欠一覧画面のDBアクセス層。生JDBCで書いている（AttendanceRegisterRepositoryと同じ方針）。
  * この画面には「出席/欠席を判定する」のような業務判断が無く、
  * 検索条件を組み立ててSQLを実行するだけなので、Serviceは作らずController直結にしている。
  *
@@ -19,11 +19,11 @@ import java.util.List;
  * 呼び出し元（Controller）にthrowsを伝播させない方針にしている。
  */
 @Repository
-public class ListRepository {
+public class AttendanceListRepository {
 
     private final DataSource dataSource;
 
-    public ListRepository(DataSource dataSource) {
+    public AttendanceListRepository(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 

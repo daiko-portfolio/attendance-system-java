@@ -40,11 +40,11 @@ import java.util.Map;
  * 呼び出し元に処理を強制せず、そのままアプリを止めてしまう扱いにしている。
  */
 @Repository
-public class RegisterRepository {
+public class AttendanceRegisterRepository {
 
     private final DataSource dataSource;
 
-    public RegisterRepository(DataSource dataSource) {
+    public AttendanceRegisterRepository(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 

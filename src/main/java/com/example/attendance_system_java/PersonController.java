@@ -19,7 +19,7 @@ import java.util.Map;
 /**
  * 生徒管理画面のController。
  * 一覧の一括更新は "person_id_<id>" のような動的なパラメータ名を使い、
- * RegisterController/EditControllerと同じMap受け取りの仕組みを使っている。
+ * AttendanceRegisterController/AttendanceEditControllerと同じMap受け取りの仕組みを使っている。
  *
  * DBアクセスは生JDBC（Connection/PreparedStatement/ResultSet）で書いている。
  * SQLExceptionはこのクラス内でキャッチしてRuntimeExceptionに変換し、
@@ -65,7 +65,7 @@ public class PersonController {
         }
 
         // 検索条件（教室・名前）は指定された時だけWHERE句に足していく。
-        // ListRepositoryと同じ「SQLとパラメータのリストを一緒に育てる」書き方。
+        // AttendanceListRepositoryと同じ「SQLとパラメータのリストを一緒に育てる」書き方。
         StringBuilder sql = new StringBuilder("""
                 SELECT
                     p.person_id,
