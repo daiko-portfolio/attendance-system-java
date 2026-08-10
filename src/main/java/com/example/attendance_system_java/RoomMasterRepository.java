@@ -12,14 +12,14 @@ import java.util.List;
 
 /**
  * 部屋（使用場所）マスタのDBアクセス層。生JDBCで書いている。
- * 構造は TeacherRepository とほぼ同じで、対象テーブルが rooms になっている。
+ * 構造は TeacherMasterRepository とほぼ同じで、対象テーブルが rooms になっている。
  */
 @Repository
-public class RoomRepository {
+public class RoomMasterRepository {
 
     private final DataSource dataSource;
 
-    public RoomRepository(DataSource dataSource) {
+    public RoomMasterRepository(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 

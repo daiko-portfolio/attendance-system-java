@@ -20,11 +20,11 @@ import java.util.List;
  * 呼び出し元（Service/Controller）にthrowsを伝播させない。
  */
 @Repository
-public class TeacherRepository {
+public class TeacherMasterRepository {
 
     private final DataSource dataSource;
 
-    public TeacherRepository(DataSource dataSource) {
+    public TeacherMasterRepository(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 

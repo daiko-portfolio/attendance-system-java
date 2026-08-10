@@ -86,7 +86,11 @@
 
 DBアクセスは全画面とも生JDBC（`Connection`/`PreparedStatement`/`ResultSet`のtry-with-resources）に統一しています。C#のADO.NET（`SqlConnection`/`SqlCommand`/`SqlDataReader`）とほぼ1対1で対応する書き方で、ORMやJdbcTemplateに頼らず接続の取得からクローズまでを自分で書き、DBアクセスの仕組みを隠さないことを優先しました（例外はDDL実行だけの`DatabaseInitializer`と、SQLファイルを流すだけの`SampleDataService`。この2つは単純なSQL実行の繰り返しなのでJdbcTemplateのままです）。
 
-層構成は画面によってばらつきがあります。`AttendanceRegister`/`ScheduleRegister`/`ScheduleCalendar`/`Teacher`/`Room`はController / Service / Repositoryの3層、`AttendanceList`はController / Repository、`Class`/`Person`/`AttendanceEdit`/`AttendanceMonthly`/`AttendanceSummary`はControllerにSQLを直接書く構成です。3層化は現在進行中で、[今後の追加予定](#今後の追加予定)にも入れています。
+層構成は画面の性質で使い分けています。
+
+- **3層(Controller/Service/Repository)**: `AttendanceRegister`/`AttendanceEdit`/`ScheduleRegister`/`ScheduleCalendar` — 出席/欠席の判定、重複チェックなど業務判断がある機能
+- **2層(Controller/Repository、Service省略)**: `AttendanceList`/マスタ管理4系統(`ClassMaster`/`PersonMaster`/`TeacherMaster`/`RoomMaster`) — 業務判断の無い単純なCRUD。「名前が空欄なら登録・更新しない」という入力チェックはServiceを作らずController内のガード文で行っている
+- **Controllerに直書き**: `AttendanceMonthly`/`AttendanceSummary` — DBの縦持ちデータを画面用に組み替える処理が複雑なため、層分けは今後の課題（[今後の追加予定](#今後の追加予定)参照）
 
 クラス名は「画面の機能＋役割」が分かるように、出欠まわりは`Attendance`、スケジュール登録は`ScheduleRegister`を頭に付けています（月次カレンダー閲覧の`ScheduleCalendar`と、週単位登録の`ScheduleRegister`を区別するため）。
 
@@ -114,18 +118,18 @@ attendance-system-java/
 │   ├── DatabaseInitializer.java   … 起動時にテーブル作成・初期データ投入
 │   ├── IndexController.java      … メニュー
 │   │
-│   │  （出欠まわり：登録は3層、他はControllerにSQL直書き）
+│   │  （出欠まわり：Monthly/Summaryだけ層分け未対応）
 │   ├── AttendanceRegisterController.java / AttendanceRegisterService.java / AttendanceRegisterRepository.java
+│   ├── AttendanceEditController.java / AttendanceEditService.java / AttendanceEditRepository.java
 │   ├── AttendanceListController.java / AttendanceListRepository.java
 │   ├── AttendanceMonthlyController.java
 │   ├── AttendanceSummaryController.java
-│   ├── AttendanceEditController.java
 │   │
-│   │  （マスタ管理）
-│   ├── ClassController.java
-│   ├── PersonController.java
-│   ├── TeacherController.java / TeacherService.java / TeacherRepository.java
-│   ├── RoomController.java / RoomService.java / RoomRepository.java
+│   │  （マスタ管理：ClassMaster〜/PersonMaster〜/TeacherMaster〜/RoomMaster〜で統一、全て2層）
+│   ├── ClassMasterController.java / ClassMasterRepository.java
+│   ├── PersonMasterController.java / PersonMasterRepository.java
+│   ├── TeacherMasterController.java / TeacherMasterRepository.java
+│   ├── RoomMasterController.java / RoomMasterRepository.java
 │   │
 │   │  （スケジュール：3層構成）
 │   ├── ScheduleRegisterController.java / ScheduleRegisterService.java / ScheduleRegisterRepository.java
@@ -165,6 +169,8 @@ cd JAVA_attendance_system\attendance-system-java
 
 DBはSQLiteの `data/attendance.db` です。起動時（`DatabaseInitializer`）に、無ければテーブルを自動作成します。
 
+SQLiteは外部キー制約が接続ごとにデフォルトOFFのため、`application.properties`の`spring.datasource.hikari.connection-init-sql=PRAGMA foreign_keys = ON`で、接続プール（HikariCP）が新しい接続を作るたびに有効化しています。
+
 ![ER図](docs/images/database-schema.png)
 
 | テーブル | 内容 |
@@ -188,7 +194,7 @@ SQLiteのUNIQUE制約はNULL同士を別物として扱うため、「休み」�
 
 ## 今後の追加予定
 
-- `Class`/`Person`/`AttendanceEdit`/`AttendanceMonthly`/`AttendanceSummary`のController / Service / Repositoryへの3層化
+- `AttendanceMonthly`/`AttendanceSummary`の層分け（DBの縦持ちデータを画面用に組み替える処理をServiceへ切り出す）
 - ログイン機能
 - スケジュール登録画面：行単位での一括「休み」設定（JavaScriptでの即時反映）
 - 出欠一覧のCSV出力（`/list/csv`）

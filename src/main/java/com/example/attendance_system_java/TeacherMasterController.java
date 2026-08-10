@@ -10,28 +10,30 @@ import java.util.Map;
 
 /**
  * 教師マスタ管理画面のController。
- * Controller / Service / Repository の3層構成で作っている。
- * Controllerはリクエストの受け取りと画面表示だけを担当し、
- * 実際の登録・更新の判断はTeacherServiceに任せる。
+ * 業務判断が無い単純なCRUDなので、Serviceを挟まずTeacherMasterRepositoryを直接呼んでいる。
+ * 「名前が空なら登録・更新しない」というチェックだけはここ（Controller）で行う。
  */
 @Controller
-public class TeacherController {
+public class TeacherMasterController {
 
-    private final TeacherService teacherService;
+    private final TeacherMasterRepository teacherRepository;
 
-    public TeacherController(TeacherService teacherService) {
-        this.teacherService = teacherService;
+    public TeacherMasterController(TeacherMasterRepository teacherRepository) {
+        this.teacherRepository = teacherRepository;
     }
 
     @GetMapping("/teachers")
     public String teachers(Model model) {
-        model.addAttribute("teachers", teacherService.findAll());
+        model.addAttribute("teachers", teacherRepository.findAll());
         return "teachers";
     }
 
     @PostMapping("/teachers/create")
     public String create(@RequestParam("teacher_name") String teacherName) {
-        teacherService.create(teacherName);
+        if (teacherName == null || teacherName.isBlank()) {
+            return "redirect:/teachers";
+        }
+        teacherRepository.insert(teacherName.trim());
         return "redirect:/teachers";
     }
 
@@ -41,11 +43,21 @@ public class TeacherController {
      */
     @PostMapping("/teachers/update")
     public String update(@RequestParam Map<String, String> allParams) {
-        long teacherId = Long.parseLong(allParams.get("teacher_id"));
         String teacherName = allParams.get("teacher_name");
-        boolean isActive = allParams.containsKey("is_active");
+        if (teacherName == null || teacherName.isBlank()) {
+            return "redirect:/teachers";
+        }
 
-        teacherService.update(teacherId, teacherName, isActive);
+        long teacherId = Long.parseLong(allParams.get("teacher_id"));
+
+        int isActive;
+        if (allParams.containsKey("is_active")) {
+            isActive = 1;
+        } else {
+            isActive = 0;
+        }
+
+        teacherRepository.update(teacherId, teacherName.trim(), isActive);
         return "redirect:/teachers";
     }
 }
