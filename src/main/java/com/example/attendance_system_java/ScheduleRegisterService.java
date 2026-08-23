@@ -85,14 +85,16 @@ public class ScheduleRegisterService {
      * 1週間分のスケジュールを一括登録する。
      * 重複が1件でもあれば全体を登録しない。
      *
-     * @param entries   登録する全コマ（休みのコマ含む。教師・場所とも未選択のコマは含まれない）
+     * @param entries   登録する全コマ（休みのコマ含む。教師が未選択のコマは含まれない）
      * @param classIds  今回の登録対象クラスのID一覧（入れ替えでDELETEする範囲の指定に使う）
+     * @param checkNos  今回の登録対象の区分一覧（1=午前, 2=午後。入れ替えでDELETEする範囲の指定に使う）
      * @param weekStart 対象週の月曜日（yyyy-MM-dd）
      * @param weekEnd   対象週の日曜日（yyyy-MM-dd）
      */
     public RegisterResult registerWeek(
             List<CellEntry> entries,
             List<Long> classIds,
+            List<Integer> checkNos,
             String weekStart,
             String weekEnd
     ) {
@@ -128,7 +130,12 @@ public class ScheduleRegisterService {
 
         for (CellEntry entry : entries) {
 
-            // 「休み」のコマは教師・場所が無いのでチェック対象外
+            // 「休み」のコマは教師・場所を持たないのでチェック対象外。
+            // 「休講」は教師・場所の情報を持つが、このアプリでは休講を「災害等でその日全クラスを
+            // 一斉に休講にする」時にしか使わない運用を前提にしており、同じ時間帯に他クラスの
+            // 「通常」授業が並行して存在することは無いため、重複チェックの対象外にしている
+            // （もし将来「特定クラスだけ休講にして教師・場所を別クラスへ回す」運用を追加するなら、
+            //  ここで休講も重複チェックの対象に含める必要がある）
             if (!entry.status().equals("通常")) {
                 continue;
             }
@@ -184,10 +191,16 @@ public class ScheduleRegisterService {
         for (CellEntry entry : entries) {
 
             if (entry.status().equals("休み")) {
-                // 休みでもメモ（休講理由など）は残す
+                // 休みは教師・場所を持たない（そもそも授業日でないため）
                 rows.add(new ScheduleRegisterRepository.ScheduleRow(
                         entry.classId(), entry.scheduleDate(), entry.checkNo(),
                         "休み", null, null, null, entry.memo()
+                ));
+            } else if (entry.status().equals("休講")) {
+                // 休講は「本来の予定」を記録として残すため、教師・場所・属性はNULLにせずそのまま保存する
+                rows.add(new ScheduleRegisterRepository.ScheduleRow(
+                        entry.classId(), entry.scheduleDate(), entry.checkNo(),
+                        "休講", entry.lessonType(), entry.teacherId(), entry.roomId(), entry.memo()
                 ));
             } else {
                 rows.add(new ScheduleRegisterRepository.ScheduleRow(
@@ -197,7 +210,7 @@ public class ScheduleRegisterService {
             }
         }
 
-        scheduleRepository.replaceWeekSchedules(classIds, weekStart, weekEnd, rows);
+        scheduleRepository.replaceWeekSchedules(classIds, checkNos, weekStart, weekEnd, rows);
 
         return new RegisterResult(true, errorMessages, conflictCells);
     }

@@ -119,6 +119,17 @@ public class AttendanceMonthlyController {
         return new DaysHours(hours / 6, hours % 6);
     }
 
+    /**
+     * 区分（check_no）ごとの1コマあたりの時間を返す。
+     * 午前午後(1,2)は3h、補講(3)は1h。
+     */
+    private static int hoursForCheckNo(int checkNo) {
+        if (checkNo == 3) {
+            return 1;
+        }
+        return 3;
+    }
+
     @GetMapping("/monthly")
     public String monthly(
             @RequestParam(name = "class_id", required = false) String selectedClassId,
@@ -256,6 +267,7 @@ public class AttendanceMonthlyController {
                 String checkLabel = switch (slotKey.checkNo()) {
                     case 1 -> "AM";
                     case 2 -> "PM";
+                    case 3 -> "補講";
                     default -> String.valueOf(slotKey.checkNo());
                 };
 
@@ -264,17 +276,18 @@ public class AttendanceMonthlyController {
 
             // 月全体の「最大授業時間」を集計する。
             // ※全生徒の出席合計ではなく、「その月に登録されているコマの数」から
-            //  最大値（1コマ=3h）を出しているだけの点に注意
-            //  （欠席者がいても、コマ自体があれば3hとしてカウントされる）
+            //  最大値を出しているだけの点に注意（欠席者がいても、コマ自体があれば加算される）。
+            //  1コマあたりの時間は区分によって違う（午前午後=3h、補講=1h。hoursForCheckNo参照）
             for (Slot slot : slots) {
                 String lessonType = slotTypeMap.get(new SlotKey(slot.date(), slot.checkNo()));
+                int hoursPerSlot = hoursForCheckNo(slot.checkNo());
 
-                monthSummary.totalMax += 3;
+                monthSummary.totalMax += hoursPerSlot;
 
                 if ("学科".equals(lessonType)) {
-                    monthSummary.academicMax += 3;
+                    monthSummary.academicMax += hoursPerSlot;
                 } else if ("実技".equals(lessonType)) {
-                    monthSummary.practicalMax += 3;
+                    monthSummary.practicalMax += hoursPerSlot;
                 }
             }
 
@@ -309,16 +322,17 @@ public class AttendanceMonthlyController {
                     if (data != null) {
                         displayType = data.lessonType();
                         displayHours = data.attendedHours();
+                        int hoursPerSlot = hoursForCheckNo(slot.checkNo());
 
                         totalAttended += displayHours;
-                        totalMax += 3;
+                        totalMax += hoursPerSlot;
 
                         if ("学科".equals(data.lessonType())) {
                             academicAttended += displayHours;
-                            academicMax += 3;
+                            academicMax += hoursPerSlot;
                         } else if ("実技".equals(data.lessonType())) {
                             practicalAttended += displayHours;
-                            practicalMax += 3;
+                            practicalMax += hoursPerSlot;
                         }
                     } else {
                         displayType = "未登録";

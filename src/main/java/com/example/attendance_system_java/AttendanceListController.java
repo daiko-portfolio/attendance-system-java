@@ -37,7 +37,18 @@ public class AttendanceListController {
         List<AttendanceListRepository.ClassOption> classes = listRepository.findActiveClasses();
         List<AttendanceListRepository.AttendanceRow> rows = listRepository.findAttendanceRows(searchDate, selectedClassId, searchName);
 
+        // 補講は毎日あるものではないため、今回の検索結果に1件も無ければ列自体を出さない
+        // （午前・午後は必ず出る前提の列なので、こちらは常に出している）
+        boolean hasMakeupData = false;
+        for (AttendanceListRepository.AttendanceRow row : rows) {
+            if (row.makeupHours() != null) {
+                hasMakeupData = true;
+                break;
+            }
+        }
+
         model.addAttribute("rows", rows);
+        model.addAttribute("hasMakeupData", hasMakeupData);
         model.addAttribute("classes", classes);
         model.addAttribute("searchDate", searchDate);
         model.addAttribute("searchName", searchName);

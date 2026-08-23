@@ -34,6 +34,7 @@
     <select name="check_no" required>
         <option value="1" th:selected="${selectedCheckNo == '1'}">午前</option>
         <option value="2" th:selected="${selectedCheckNo == '2'}">午後</option>
+        <option value="3" th:selected="${selectedCheckNo == '3'}">補講</option>
     </select>
 
     <button type="submit" class="btn btn-search">表示</button>
@@ -49,7 +50,7 @@
 
     <p>
         日付：<span th:text="${selectedDate}"></span>
-        ／区分：<span th:if="${selectedCheckNo == '1'}">午前</span><span th:unless="${selectedCheckNo == '1'}">午後</span>
+        ／区分：<span th:if="${selectedCheckNo == '1'}">午前</span><span th:if="${selectedCheckNo == '2'}">午後</span><span th:if="${selectedCheckNo == '3'}">補講</span>
         ／授業属性：
         <select name="lesson_type" required>
             <option value="学科" th:selected="${selectedLessonType == '学科'}">学科</option>
@@ -70,8 +71,23 @@
               th:text="'（メモ: ' + ${scheduleInfo.memo} + '）'"></span>
     </p>
 
-    <p th:if="${scheduleInfo == null}" style="color: #999;">
+    <!-- 休講は本来の予定（教師/場所/属性）が記録として残っているので、参考情報として一緒に表示する -->
+    <p th:if="${scheduleInfo != null and scheduleInfo.status == '休講'}" style="color: #c0392b; font-weight: bold;">
+        ※この日はスケジュール上「休講」として登録されています
+        <span th:if="${scheduleInfo.teacherName != null}"
+              th:text="'（本来の予定: ' + ${scheduleInfo.teacherName} + ' / ' + ${scheduleInfo.roomName} + ' / ' + ${scheduleInfo.lessonType} + '）'"></span>
+        <span th:if="${scheduleInfo.memo != null and !scheduleInfo.memo.isEmpty()}"
+              th:text="'（理由: ' + ${scheduleInfo.memo} + '）'"></span>
+    </p>
+
+    <!-- 補講(区分=3)だけは、スケジュール未登録のまま出欠を取ろうとしている状態を「休み」と同じ強さの警告にする
+         （通常の午前午後と違い、補講はスケジュールで決めた日にだけ行われる想定のコマのため） -->
+    <p th:if="${scheduleInfo == null and selectedCheckNo != '3'}" style="color: #999;">
         この日の授業スケジュールは未登録です
+    </p>
+
+    <p th:if="${scheduleInfo == null and selectedCheckNo == '3'}" style="color: #c0392b; font-weight: bold;">
+        ※この日は補講としてスケジュール登録されていません
     </p>
 
     <h2 th:text="${className}"></h2>
@@ -96,7 +112,10 @@
               ラジオボタンのname属性は "attended_hours_生徒ID" という動的な名前にしていて、
               Controller側では前方一致（attended_hours_で始まるか）で拾い出す仕組み。
             -->
-            <td th:with="hasData=${currentHours.containsKey(person.personId)}, curHours=${currentHours.get(person.personId)}">
+            <!-- 補講（区分=3）は1コマ1hのため、出席時間は「出席(1h)/欠席(0h)」の2択にする。
+                 通常の午前午後は3hのコマなので、従来通り4択（3h/2h/1h/0h）のまま -->
+            <td th:if="${selectedCheckNo != '3'}"
+                th:with="hasData=${currentHours.containsKey(person.personId)}, curHours=${currentHours.get(person.personId)}">
                 <label class="radio-btn radio-present">
                     <!-- 「全出席」の初期選択条件：未登録なら初期値として選択、登録済みなら保存値が3の時だけ選択 -->
                     <input
@@ -126,6 +145,29 @@
                         th:checked="${curHours == 1}"
                     >
                     <span>1h</span>
+                </label>
+
+                <label class="radio-btn radio-absent">
+                    <input
+                        type="radio"
+                        th:name="${'attended_hours_' + person.personId}"
+                        value="0"
+                        th:checked="${curHours == 0}"
+                    >
+                    <span>欠席</span>
+                </label>
+            </td>
+
+            <td th:if="${selectedCheckNo == '3'}"
+                th:with="hasData=${currentHours.containsKey(person.personId)}, curHours=${currentHours.get(person.personId)}">
+                <label class="radio-btn radio-present">
+                    <input
+                        type="radio"
+                        th:name="${'attended_hours_' + person.personId}"
+                        value="1"
+                        th:checked="${!hasData or curHours == 1}"
+                    >
+                    <span>出席</span>
                 </label>
 
                 <label class="radio-btn radio-absent">

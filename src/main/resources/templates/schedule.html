@@ -30,6 +30,10 @@
         .row-sunday td {
             background-color: #ECE3F7;
         }
+        /* 補講(放課後)：他と紛れないよう薄い緑にする */
+        .row-makeup td {
+            background-color: #EAF6EC;
+        }
         /* 重複セルは上記より優先して薄い赤にする */
         .cell-conflict {
             background-color: #ffd9d9 !important;
@@ -46,10 +50,18 @@
 
 <h1>授業スケジュール登録</h1>
 
-<!-- 週の選択 -->
+<!-- 週の選択・通常/補講の表示切替 -->
 <form action="/schedule" method="get">
     週：
     <input type="week" name="week" th:value="${weekValue}" required>
+
+    <label>
+        <input type="radio" name="view" value="normal" th:checked="${!isMakeup}">通常
+    </label>
+    <label>
+        <input type="radio" name="view" value="makeup" th:checked="${isMakeup}">補講
+    </label>
+
     <button type="submit" class="btn btn-search">表示</button>
 </form>
 
@@ -70,6 +82,7 @@
 <form action="/schedule/submit" method="post">
 
     <input type="hidden" name="week" th:value="${weekValue}">
+    <input type="hidden" name="view" th:value="${view}">
 
     <div class="table-scroll">
     <table class="schedule-table">
@@ -87,10 +100,11 @@
                 th:with="suffix=${cls.classId + '_' + row.dayIndex + '_' + row.checkNo}"
                 th:classappend="${conflictCells.contains(suffix)} ? 'cell-conflict'">
 
-                <!-- 状態（通常/休み） -->
-                <select th:name="${'status_' + suffix}">
+                <!-- 状態（通常/休み/休講）：補講画面には状態そのものが無いので表示しない -->
+                <select th:unless="${isMakeup}" th:name="${'status_' + suffix}">
                     <option value="通常" th:selected="${formValues['status_' + suffix] == '通常'}">通常</option>
                     <option value="休み" th:selected="${formValues['status_' + suffix] == '休み'}">休み</option>
+                    <option value="休講" th:selected="${formValues['status_' + suffix] == '休講'}">休講</option>
                 </select>
 
                 <!-- 教師 -->
@@ -139,8 +153,13 @@
 
 <br>
 
-<p>
-    ※「通常」で教師・場所とも未選択のコマは登録されません（未定のコマとして扱われます）。<br>
+<p th:unless="${isMakeup}">
+    ※「通常」で教師を選択しないコマは登録されません（未定のコマとして扱われます。場所は既定値が入っていても問題ありません）。<br>
+    ※「休講」にする場合は、コメント欄に理由の入力が必須です。<br>
+    ※ 教師・場所の重複が1件でもあると、この週全体が登録されません。
+</p>
+<p th:if="${isMakeup}">
+    ※ 教師を選択しないコマは登録されません（補講が無い日として扱われます。場所は既定値が入っていても問題ありません）。<br>
     ※ 教師・場所の重複が1件でもあると、この週全体が登録されません。
 </p>
 

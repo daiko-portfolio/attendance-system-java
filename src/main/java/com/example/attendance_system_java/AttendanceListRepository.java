@@ -37,7 +37,9 @@ public class AttendanceListRepository {
             String morningLessonType,
             Integer morningHours,
             String afternoonLessonType,
-            Integer afternoonHours
+            Integer afternoonHours,
+            String makeupLessonType,
+            Integer makeupHours
     ) {
 
         /**
@@ -117,7 +119,9 @@ public class AttendanceListRepository {
                     MAX(CASE WHEN a.check_no = 1 THEN a.lesson_type END) AS morning_lesson_type,
                     MAX(CASE WHEN a.check_no = 1 THEN a.attended_hours END) AS morning_hours,
                     MAX(CASE WHEN a.check_no = 2 THEN a.lesson_type END) AS afternoon_lesson_type,
-                    MAX(CASE WHEN a.check_no = 2 THEN a.attended_hours END) AS afternoon_hours
+                    MAX(CASE WHEN a.check_no = 2 THEN a.attended_hours END) AS afternoon_hours,
+                    MAX(CASE WHEN a.check_no = 3 THEN a.lesson_type END) AS makeup_lesson_type,
+                    MAX(CASE WHEN a.check_no = 3 THEN a.attended_hours END) AS makeup_hours
                 FROM attendance a
                 JOIN persons p ON a.person_id = p.person_id
                 JOIN classes c ON p.class_id = c.class_id
@@ -166,6 +170,7 @@ public class AttendanceListRepository {
                     String attendanceDate = rs.getString("attendance_date");
                     String morningLessonType = rs.getString("morning_lesson_type");
                     String afternoonLessonType = rs.getString("afternoon_lesson_type");
+                    String makeupLessonType = rs.getString("makeup_lesson_type");
 
                     // 午前・午後が未登録の場合、attended_hours列はNULLになりうる。
                     // 生JDBCのgetInt()はNULLを0として返してしまうため、
@@ -189,6 +194,14 @@ public class AttendanceListRepository {
                         afternoonHours = afternoonHoursValue;
                     }
 
+                    int makeupHoursValue = rs.getInt("makeup_hours");
+                    Integer makeupHours;
+                    if (rs.wasNull()) {
+                        makeupHours = null;
+                    } else {
+                        makeupHours = makeupHoursValue;
+                    }
+
                     result.add(new AttendanceRow(
                             className,
                             attendanceNo,
@@ -197,7 +210,9 @@ public class AttendanceListRepository {
                             morningLessonType,
                             morningHours,
                             afternoonLessonType,
-                            afternoonHours
+                            afternoonHours,
+                            makeupLessonType,
+                            makeupHours
                     ));
                 }
             }

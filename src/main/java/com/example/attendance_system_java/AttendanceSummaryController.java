@@ -94,9 +94,12 @@ public class AttendanceSummaryController {
      * コース進捗（必要時間に対する実施率）を組み立てる。
      *
      * 「実施済み時間」は生徒ごとの出席時間の合計ではなく、
-     * 「このクラスで出欠が記録されているコマ（日付×午前午後）の数 × 3h」で数える。
+     * 「このクラスで出欠が記録されているコマ（日付×区分）の数 × コマ1つあたりの時間」で数える。
      * 授業をやったかどうかが基準で、個々の生徒の出欠状況（休んだかどうか）は関係ない
      * ため、COUNT(DISTINCT ...) でコマの重複を除いて数えている。
+     *
+     * コマ1つあたりの時間は区分によって違う：午前午後(check_no 1,2)は3h、補講(check_no 3)は1h。
+     * そのため区分ごとに分けて集計し、区分に応じた時間を掛けてから合計する。
      */
     private CourseProgress buildCourseProgress(String classId) {
         int requiredAcademicHours = 0;
@@ -126,13 +129,14 @@ public class AttendanceSummaryController {
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement("""
-                     SELECT
-                         a.lesson_type,
-                         COUNT(DISTINCT a.attendance_date || '_' || a.check_no) AS slot_count
-                     FROM attendance a
-                     JOIN persons p ON a.person_id = p.person_id
-                     WHERE p.class_id = ?
-                     GROUP BY a.lesson_type
+                     SELECT lesson_type, check_no, COUNT(*) AS slot_count
+                     FROM (
+                         SELECT DISTINCT p.class_id, a.attendance_date, a.check_no, a.lesson_type
+                         FROM attendance a
+                         JOIN persons p ON a.person_id = p.person_id
+                     ) slots
+                     WHERE class_id = ?
+                     GROUP BY lesson_type, check_no
                      """)) {
 
             stmt.setString(1, classId);
@@ -140,12 +144,21 @@ public class AttendanceSummaryController {
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     String lessonType = rs.getString("lesson_type");
+                    int checkNo = rs.getInt("check_no");
                     int slotCount = rs.getInt("slot_count");
 
+                    // 午前午後(1,2)は1コマ3h、補講(3)は1コマ1h
+                    int hoursPerSlot;
+                    if (checkNo == 3) {
+                        hoursPerSlot = 1;
+                    } else {
+                        hoursPerSlot = 3;
+                    }
+
                     if ("学科".equals(lessonType)) {
-                        academicDone = slotCount * 3;
+                        academicDone += slotCount * hoursPerSlot;
                     } else if ("実技".equals(lessonType)) {
-                        practicalDone = slotCount * 3;
+                        practicalDone += slotCount * hoursPerSlot;
                     }
                 }
             }

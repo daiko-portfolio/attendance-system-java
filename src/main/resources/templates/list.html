@@ -35,12 +35,7 @@
 
     <button type="submit" class="btn btn-search">検索</button>
 
-    <a
-        class="btn btn-create"
-        th:href="@{/list/csv(date=${searchDate}, class_id=${selectedClassId}, name=${searchName}, lesson_type=${selectedLessonType})}"
-        >
-        CSV出力
-    </a>
+    <!-- CSV出力は未実装（README「今後の追加予定」参照）。実装するまでリンクは出さない -->
 
     <a href="/list">全件表示</a>
 </form>
@@ -55,6 +50,7 @@
         <th>日付</th>
         <th>午前</th>
         <th>午後</th>
+        <th th:if="${hasMakeupData}">補講</th>
     </tr>
 
     <tr th:each="row : ${rows}">
@@ -79,6 +75,15 @@
                 <span th:text="${row.afternoonHours} + 'h'"></span>
             </span>
             <span th:unless="${row.afternoonHours != null}">未登録</span>
+        </td>
+
+        <!-- 補講：検索結果に1件も無ければ列自体が出ないので、この<td>もth:ifの外の<th>と対になる -->
+        <td th:if="${hasMakeupData}" th:class="${row.statusClass(row.makeupHours)}">
+            <span th:if="${row.makeupHours != null}">
+                <span th:text="${row.makeupLessonType}"></span><br>
+                <span th:text="${row.makeupHours} + 'h'"></span>
+            </span>
+            <span th:unless="${row.makeupHours != null}">未登録</span>
         </td>
 
     </tr>

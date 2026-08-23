@@ -54,6 +54,10 @@
         .cal-holiday {
             color: #999;
         }
+        /* 補講：教室別画面と揃えた緑系にする */
+        .cal-makeup {
+            color: #1e8449;
+        }
         .cal-memo {
             white-space: nowrap;
             overflow: hidden;
@@ -115,9 +119,14 @@
 
                 <div class="cal-day-num" th:text="${day.dayOfMonth}"></div>
 
-                <!-- 午前：この教師が担当する授業がある時だけ表示される -->
+                <!-- 午前：この教師が担当する授業がある時だけ表示される。
+                     休講(cancelled)は「休み」と違って教師の予定として残っているため、この教師の画面にも
+                     本来の予定（クラス/場所/属性）が「【休講】」付きで表示される -->
                 <div class="cal-slot cal-am" th:if="${day.am.registered}">
-                    <span th:text="'AM: ' + ${day.am.className} + '/' + ${day.am.roomName} + ' ' + ${day.am.lessonType}"></span>
+                    <span th:if="${day.am.cancelled}" class="cal-cancelled"
+                          th:text="'AM: 【休講】' + ${day.am.className} + '/' + ${day.am.roomName} + ' ' + ${day.am.lessonType}"></span>
+                    <span th:unless="${day.am.cancelled}"
+                          th:text="'AM: ' + ${day.am.className} + '/' + ${day.am.roomName} + ' ' + ${day.am.lessonType}"></span>
                     <div class="cal-memo"
                          th:if="${day.am.memo != null and !day.am.memo.isEmpty()}"
                          th:title="${day.am.memo}"
@@ -126,11 +135,23 @@
 
                 <!-- 午後：この教師が担当する授業がある時だけ表示される -->
                 <div class="cal-slot cal-pm" th:if="${day.pm.registered}">
-                    <span th:text="'PM: ' + ${day.pm.className} + '/' + ${day.pm.roomName} + ' ' + ${day.pm.lessonType}"></span>
+                    <span th:if="${day.pm.cancelled}" class="cal-cancelled"
+                          th:text="'PM: 【休講】' + ${day.pm.className} + '/' + ${day.pm.roomName} + ' ' + ${day.pm.lessonType}"></span>
+                    <span th:unless="${day.pm.cancelled}"
+                          th:text="'PM: ' + ${day.pm.className} + '/' + ${day.pm.roomName} + ' ' + ${day.pm.lessonType}"></span>
                     <div class="cal-memo"
                          th:if="${day.pm.memo != null and !day.pm.memo.isEmpty()}"
                          th:title="${day.pm.memo}"
                          th:text="'メモ: ' + ${day.pm.memo}"></div>
+                </div>
+
+                <!-- 補講（放課後）：この教師が担当する補講がある時だけ、午前午後の下に追加表示する -->
+                <div class="cal-slot cal-makeup" th:if="${day.makeup.registered}">
+                    <span th:text="'補講: ' + ${day.makeup.className} + '/' + ${day.makeup.roomName} + ' ' + ${day.makeup.lessonType}"></span>
+                    <div class="cal-memo"
+                         th:if="${day.makeup.memo != null and !day.makeup.memo.isEmpty()}"
+                         th:title="${day.makeup.memo}"
+                         th:text="'メモ: ' + ${day.makeup.memo}"></div>
                 </div>
 
             </td>

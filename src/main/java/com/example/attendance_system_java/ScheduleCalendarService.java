@@ -30,12 +30,14 @@ public class ScheduleCalendarService {
     /**
      * 1マスの午前 or 午後の中身。
      * registered=false … その日その区分にスケジュールが無い（空欄表示）
-     * holiday=true      … 「休み」として登録されている
+     * holiday=true      … 「休み」として登録されている（そもそも授業日でない）
+     * cancelled=true    … 「休講」として登録されている（授業日として予定していたが中止）
      * それ以外          … 教師・場所・属性・メモを表示する
      */
     public record CellSlot(
             boolean registered,
             boolean holiday,
+            boolean cancelled,
             String lessonType,
             String className,
             String teacherName,
@@ -46,6 +48,8 @@ public class ScheduleCalendarService {
     /**
      * カレンダーの1日分のマス。
      * inMonth=false は「前後の月のはみ出し日」で、薄く表示する用のフラグ。
+     * makeup（放課後・check_no=3）はその日に補講が無ければ registered=false になり、
+     * 画面側では表示自体が省略される（午前午後と違い、無い日の方が多いコマのため）。
      */
     public record DayCell(
             String dateStr,
@@ -54,7 +58,8 @@ public class ScheduleCalendarService {
             boolean weekend,
             boolean today,
             CellSlot am,
-            CellSlot pm
+            CellSlot pm,
+            CellSlot makeup
     ) {
 
         /**
@@ -167,6 +172,7 @@ public class ScheduleCalendarService {
 
             CellSlot am = buildCellSlot(slotMap.get(date.toString() + "|1"));
             CellSlot pm = buildCellSlot(slotMap.get(date.toString() + "|2"));
+            CellSlot makeup = buildCellSlot(slotMap.get(date.toString() + "|3"));
 
             DayCell dayCell = new DayCell(
                     date.toString(),
@@ -175,7 +181,8 @@ public class ScheduleCalendarService {
                     weekend,
                     isToday,
                     am,
-                    pm
+                    pm,
+                    makeup
             );
             currentWeek.add(dayCell);
 
@@ -194,20 +201,27 @@ public class ScheduleCalendarService {
     /**
      * DBから取ったスケジュール1コマ分を、表示用のCellSlotに変換する。
      * 引数がnull（その日その区分は未登録）なら、空欄用のCellSlotを返す。
+     *
+     * 「休み」はteacher_id/room_idがNULLなので、教師名・場所名も空欄になる。
+     * 「休講」はteacher_id/room_idを本来の予定のまま保持しているため、
+     * 教師名・場所名・属性も「通常」と同じように表示できる（cancelledフラグだけが違う）。
      */
     private CellSlot buildCellSlot(ScheduleCalendarRepository.ScheduleSlot slot) {
         if (slot == null) {
-            return new CellSlot(false, false, null, null, null, null, null);
+            return new CellSlot(false, false, false, null, null, null, null, null);
         }
 
         boolean holiday = "休み".equals(slot.status());
         if (holiday) {
-            return new CellSlot(true, true, null, null, null, null, slot.memo());
+            return new CellSlot(true, true, false, null, null, null, null, slot.memo());
         }
+
+        boolean cancelled = "休講".equals(slot.status());
 
         return new CellSlot(
                 true,
                 false,
+                cancelled,
                 slot.lessonType(),
                 slot.className(),
                 slot.teacherName(),

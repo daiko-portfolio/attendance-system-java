@@ -113,8 +113,17 @@ public class DatabaseInitializer implements CommandLineRunner {
         //   2. 同じ教師は同じ日・同じ区分に1か所だけ
         //   3. 同じ場所は同じ日・同じ区分に1クラスだけ
         // SQLiteのUNIQUEはNULL同士を別物として扱うため、
-        // 休みの行（teacher_id/room_idがNULL）は何行あっても制約に掛からない
-        // check_noの3は「放課後」用（UIは未対応。将来の機能追加に備えてDB側だけ許可している）
+        // 休みの行（teacher_id/room_idがNULL）は何行あっても制約に掛からない。
+        // check_noの3は「放課後」用（補講で使用）
+        // statusの3種類：
+        //   通常 … 予定通り実施
+        //   休み … そもそも授業日でない（土日・祝日など。teacher_id/room_idはNULL）
+        //   休講 … 授業日として予定していたが中止になった（台風など。理由はmemoに必須で残す）。
+        //          teacher_id/room_idは「本来の予定」の記録としてNULLにせずそのまま残す。
+        //          このアプリでは休講を「その日全クラスを一斉に休講にする」時にしか
+        //          使わない運用を前提にしているため、UNIQUE制約に引っかかる心配はない
+        //          （もし特定クラスだけ休講にして教師・場所を別クラスへ回す運用を
+        //           追加するなら、teacher_id/room_idのUNIQUE制約を見直す必要がある）
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS schedules (
                     schedule_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -130,7 +139,7 @@ public class DatabaseInitializer implements CommandLineRunner {
                     UNIQUE(teacher_id, schedule_date, check_no),
                     UNIQUE(room_id, schedule_date, check_no),
                     CHECK(check_no IN (1, 2, 3)),
-                    CHECK(status IN ('通常', '休み')),
+                    CHECK(status IN ('通常', '休み', '休講')),
                     CHECK(lesson_type IN ('学科', '実技') OR lesson_type IS NULL),
                     FOREIGN KEY(class_id) REFERENCES classes(class_id),
                     FOREIGN KEY(teacher_id) REFERENCES teachers(teacher_id),

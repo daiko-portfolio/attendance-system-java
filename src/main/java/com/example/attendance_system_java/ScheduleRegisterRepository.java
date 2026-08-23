@@ -219,14 +219,21 @@ public class ScheduleRegisterRepository {
      *
      * 途中でUNIQUE制約違反（フォーム外のクラスとの教師・場所の衝突など）が起きた場合も、
      * rollbackによってDELETE分も含めて全部取り消され、DBは登録前の状態のまま残る。
+     *
+     * ■ checkNosについて
+     * 削除範囲には class_id だけでなく check_no（午前/午後/放課後の区分）も絞り込みに使う。
+     * 通常授業（check_no 1,2）の画面から送信した内容が、別区分（例えば放課後の補講）の
+     * 登録済みデータまで巻き込んで消してしまわないようにするための条件。
+     * 今はまだ午前・午後(1,2)しか画面が無いため、呼び出し元は常に List.of(1, 2) を渡している。
      */
     public void replaceWeekSchedules(
             List<Long> classIds,
+            List<Integer> checkNos,
             String startDate,
             String endDate,
             List<ScheduleRow> rows
     ) {
-        // クラスIDの数だけ ? を並べたIN句を組み立てる（例: class_id IN (?, ?, ?)）
+        // クラスID・区分それぞれの数だけ ? を並べたIN句を組み立てる（例: class_id IN (?, ?, ?)）
         StringBuilder deleteSql = new StringBuilder("""
                 DELETE FROM schedules
                 WHERE schedule_date >= ?
@@ -234,6 +241,13 @@ public class ScheduleRegisterRepository {
                 AND class_id IN (
                 """);
         for (int i = 0; i < classIds.size(); i++) {
+            if (i > 0) {
+                deleteSql.append(", ");
+            }
+            deleteSql.append("?");
+        }
+        deleteSql.append(") AND check_no IN (");
+        for (int i = 0; i < checkNos.size(); i++) {
             if (i > 0) {
                 deleteSql.append(", ");
             }
@@ -254,13 +268,21 @@ public class ScheduleRegisterRepository {
             conn.setAutoCommit(false);
 
             try {
-                // 1. 対象週×対象クラスの既存行をまとめて削除する
+                // 1. 対象週×対象クラス×対象区分の既存行をまとめて削除する
                 try (PreparedStatement stmt = conn.prepareStatement(deleteSql.toString())) {
                     stmt.setString(1, startDate);
                     stmt.setString(2, endDate);
+
+                    int paramIndex = 3;
                     for (int i = 0; i < classIds.size(); i++) {
-                        stmt.setLong(3 + i, classIds.get(i));
+                        stmt.setLong(paramIndex, classIds.get(i));
+                        paramIndex++;
                     }
+                    for (int i = 0; i < checkNos.size(); i++) {
+                        stmt.setInt(paramIndex, checkNos.get(i));
+                        paramIndex++;
+                    }
+
                     stmt.executeUpdate();
                 }
 

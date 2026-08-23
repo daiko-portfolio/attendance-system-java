@@ -195,7 +195,9 @@ INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, t
 INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (2, '2026-08-24', 2, '通常', '実技', 2, 1, NULL);
 INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (3, '2026-08-24', 1, '通常', '学科', 3, 3, NULL);
 INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (3, '2026-08-24', 2, '通常', '実技', 3, 3, NULL);
-INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (1, '2026-08-25', 1, '通常', '実技', 1, 2, NULL);
+-- Aクラスは25日午前が台風接近のため休講（半日）。失った実技3hぶんを26〜28日の補講(1h×3日)で埋め合わせる。
+-- 休講は「休み」と違い、本来の予定（教師・場所・属性）をNULLにせずそのまま記録として残す
+INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (1, '2026-08-25', 1, '休講', '実技', 1, 2, '台風接近のため休講（半日）');
 INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (1, '2026-08-25', 2, '通常', '学科', 1, 2, NULL);
 INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (2, '2026-08-25', 1, '通常', '実技', 2, 1, NULL);
 INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (2, '2026-08-25', 2, '通常', '学科', 2, 1, NULL);
@@ -219,6 +221,12 @@ INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, t
 INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (2, '2026-08-28', 2, '通常', '実技', 4, 1, NULL);
 INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (3, '2026-08-28', 1, '通常', '学科', 3, 3, NULL);
 INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (3, '2026-08-28', 2, '通常', '実技', 3, 4, NULL);
+
+-- 25日休講(実技3h)の埋め合わせの補講。放課後(check_no=3)に1hずつ、26〜28日の3日に分けて実施
+INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (1, '2026-08-26', 3, '通常', '実技', 1, 2, '25日休講分の補講(1/3)');
+INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (1, '2026-08-27', 3, '通常', '実技', 1, 2, '25日休講分の補講(2/3)');
+INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (1, '2026-08-28', 3, '通常', '実技', 1, 2, '25日休講分の補講(3/3)');
+
 INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (1, '2026-08-29', 1, '休み', NULL, NULL, NULL, NULL);
 INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (1, '2026-08-29', 2, '休み', NULL, NULL, NULL, NULL);
 INSERT INTO schedules (class_id, schedule_date, check_no, status, lesson_type, teacher_id, room_id, memo) VALUES (2, '2026-08-29', 1, '休み', NULL, NULL, NULL, NULL);
@@ -897,16 +905,6 @@ INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_typ
 INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-24', 2, 28, '出席', '実技', 2);
 INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-24', 2, 29, '出席', '実技', 3);
 INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-24', 2, 30, '出席', '実技', 3);
-INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-25', 1, 1, '出席', '実技', 3);
-INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-25', 1, 2, '出席', '実技', 3);
-INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-25', 1, 3, '欠席', '実技', 0);
-INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-25', 1, 4, '出席', '実技', 3);
-INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-25', 1, 5, '出席', '実技', 1);
-INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-25', 1, 6, '出席', '実技', 2);
-INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-25', 1, 7, '出席', '実技', 1);
-INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-25', 1, 8, '出席', '実技', 3);
-INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-25', 1, 9, '出席', '実技', 2);
-INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-25', 1, 10, '出席', '実技', 2);
 INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-25', 1, 11, '出席', '実技', 3);
 INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-25', 1, 12, '出席', '実技', 3);
 INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-25', 1, 13, '欠席', '実技', 0);
@@ -1137,6 +1135,39 @@ INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_typ
 INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-28', 2, 28, '出席', '実技', 3);
 INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-28', 2, 29, '出席', '実技', 1);
 INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-28', 2, 30, '出席', '実技', 1);
+
+-- 25日休講(Aクラス)の埋め合わせ補講。1コマ1hなので出席は0か1のみ
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-26', 3, 1, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-26', 3, 2, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-26', 3, 3, '欠席', '実技', 0);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-26', 3, 4, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-26', 3, 5, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-26', 3, 6, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-26', 3, 7, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-26', 3, 8, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-26', 3, 9, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-26', 3, 10, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-27', 3, 1, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-27', 3, 2, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-27', 3, 3, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-27', 3, 4, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-27', 3, 5, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-27', 3, 6, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-27', 3, 7, '欠席', '実技', 0);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-27', 3, 8, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-27', 3, 9, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-27', 3, 10, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-28', 3, 1, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-28', 3, 2, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-28', 3, 3, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-28', 3, 4, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-28', 3, 5, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-28', 3, 6, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-28', 3, 7, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-28', 3, 8, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-28', 3, 9, '出席', '実技', 1);
+INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-28', 3, 10, '出席', '実技', 1);
+
 INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-31', 1, 1, '出席', '学科', 1);
 INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-31', 1, 2, '出席', '学科', 3);
 INSERT INTO attendance (attendance_date, check_no, person_id, status, lesson_type, attended_hours) VALUES ('2026-08-31', 1, 3, '欠席', '学科', 0);

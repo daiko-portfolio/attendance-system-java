@@ -57,7 +57,10 @@ public class ScheduleRegisterController {
             if (checkNo == 1) {
                 return "row-am";
             }
-            return "row-pm";
+            if (checkNo == 2) {
+                return "row-pm";
+            }
+            return "row-makeup";
         }
     }
 
@@ -126,11 +129,33 @@ public class ScheduleRegisterController {
         return rows;
     }
 
+    /**
+     * 月曜日を起点に、7行分（1日1行、放課後(check_no=3)のみ）の行情報を作る。補講表示用。
+     * 通常表示(buildRows)と違い、午前午後の分割は無く1日1コマだけ。
+     * status（状態）の選択肢自体を持たない画面のため、休日でも「休み」を強制せず
+     * 全ての行を同列に並べる（weekendフラグは行の背景色にのみ使う）。
+     */
+    private List<RowInfo> buildMakeupRows(LocalDate monday) {
+        List<RowInfo> rows = new ArrayList<>();
+
+        for (int dayIndex = 0; dayIndex < 7; dayIndex++) {
+            LocalDate date = monday.plusDays(dayIndex);
+            boolean weekend = (dayIndex == 5 || dayIndex == 6);
+
+            String dateLabel = date.getMonthValue() + "/" + date.getDayOfMonth()
+                    + "(" + DAY_LABELS[dayIndex] + ")";
+
+            rows.add(new RowInfo(dayIndex, 3, date.toString(), dateLabel + " 補講", weekend));
+        }
+        return rows;
+    }
+
     // ---- 画面表示 ----
 
     @GetMapping("/schedule")
     public String schedule(
             @RequestParam(name = "week", required = false) String weekValue,
+            @RequestParam(name = "view", required = false, defaultValue = "normal") String view,
             Model model
     ) {
         // week=... が指定されていなければ今週を表示する
@@ -138,8 +163,16 @@ public class ScheduleRegisterController {
             weekValue = currentWeekValue();
         }
 
+        // view=makeup なら放課後(補講)専用の7行表示、それ以外（デフォルト）は通常の14行表示
+        boolean isMakeup = view.equals("makeup");
+
         LocalDate monday = parseWeekToMonday(weekValue);
-        List<RowInfo> rows = buildRows(monday);
+        List<RowInfo> rows;
+        if (isMakeup) {
+            rows = buildMakeupRows(monday);
+        } else {
+            rows = buildRows(monday);
+        }
         List<ScheduleRegisterRepository.ClassInfo> classes = scheduleRepository.findActiveClasses();
 
         // 初期値を組み立てる（DB登録済み > デフォルト値 の優先順）
@@ -148,6 +181,8 @@ public class ScheduleRegisterController {
         // ここで渡した値は、templates/schedule.html の中で
         // ${weekValue} や ${rows} のようにして参照できる
         model.addAttribute("weekValue", weekValue);
+        model.addAttribute("view", view);
+        model.addAttribute("isMakeup", isMakeup);
         model.addAttribute("rows", rows);
         model.addAttribute("classes", classes);
         model.addAttribute("teachers", scheduleRepository.findActiveTeachers());
@@ -274,8 +309,20 @@ public class ScheduleRegisterController {
             weekValue = currentWeekValue();
         }
 
+        // 隠しフィールドで送られてくる view で、通常/補講どちらの画面からの送信かを判定する
+        String view = allParams.get("view");
+        if (view == null) {
+            view = "normal";
+        }
+        boolean isMakeup = view.equals("makeup");
+
         LocalDate monday = parseWeekToMonday(weekValue);
-        List<RowInfo> rows = buildRows(monday);
+        List<RowInfo> rows;
+        if (isMakeup) {
+            rows = buildMakeupRows(monday);
+        } else {
+            rows = buildRows(monday);
+        }
         List<ScheduleRegisterRepository.ClassInfo> classes = scheduleRepository.findActiveClasses();
 
         // フォーム内容を業務データ（CellEntry）へ変換する
@@ -292,16 +339,37 @@ public class ScheduleRegisterController {
                 String suffix = classInfo.classId() + "_" + row.dayIndex() + "_" + row.checkNo();
                 String cellKey = suffix;
 
+                String lessonType = allParams.get("lesson_" + suffix);
+                Long teacherId = parseLongOrNull(allParams.get("teacher_" + suffix));
+                Long roomId = parseLongOrNull(allParams.get("room_" + suffix));
+                String memo = allParams.get("memo_" + suffix);
+
+                // 補講画面には状態（通常/休み/休講）のプルダウン自体が無いため、
+                // 教師の有無だけで登録/未登録を判定する（通常コマの判定と同じロジック）。
+                // status_の値を読む必要が無いので、以降の休み・休講の分岐には入らない
+                if (isMakeup) {
+                    if (teacherId == null) {
+                        continue;
+                    }
+                    if (roomId == null) {
+                        inputErrors.add(row.label() + "（" + classInfo.className() + "）：場所を選択してください");
+                        inputErrorCells.add(cellKey);
+                        continue;
+                    }
+
+                    entries.add(new ScheduleRegisterService.CellEntry(
+                            cellKey, classInfo.classId(), classInfo.className(),
+                            row.dateStr(), row.checkNo(),
+                            "通常", lessonType, teacherId, roomId, memo, row.label()
+                    ));
+                    continue;
+                }
+
                 String status = allParams.get("status_" + suffix);
                 if (status == null) {
                     // 通常は起こらないが、想定外にこのセルのデータが送られてこなかった場合はスキップ
                     continue;
                 }
-
-                String lessonType = allParams.get("lesson_" + suffix);
-                Long teacherId = parseLongOrNull(allParams.get("teacher_" + suffix));
-                Long roomId = parseLongOrNull(allParams.get("room_" + suffix));
-                String memo = allParams.get("memo_" + suffix);
 
                 if (status.equals("休み")) {
                     entries.add(new ScheduleRegisterService.CellEntry(
@@ -312,15 +380,36 @@ public class ScheduleRegisterController {
                     continue;
                 }
 
-                // 通常コマ：教師も場所も未選択なら「まだ決まっていないコマ」として登録しない
-                if (teacherId == null && roomId == null) {
+                // 休講：教師・場所・属性は「休み」と違ってNULLにせず、切り替える直前に選ばれていた
+                // 内容（本来の予定）をそのまま残す。教師や場所を選び直す必要が無く、
+                // 「通常」で入力済みの内容をそのまま「休講」に切り替えるだけで記録が残る。
+                // なぜ休講にしたかが後から追えるように、コメント（理由）の入力は必須にする
+                if (status.equals("休講")) {
+                    if (memo == null || memo.isBlank()) {
+                        inputErrors.add(row.label() + "（" + classInfo.className() + "）：休講にする理由をコメントに入力してください");
+                        inputErrorCells.add(cellKey);
+                        continue;
+                    }
+
+                    entries.add(new ScheduleRegisterService.CellEntry(
+                            cellKey, classInfo.classId(), classInfo.className(),
+                            row.dateStr(), row.checkNo(),
+                            "休講", lessonType, teacherId, roomId, memo, row.label()
+                    ));
                     continue;
                 }
 
-                // 片方だけ選択されている場合は入力エラーにする
+                // 通常コマ：教師が未選択なら「まだ決まっていないコマ」として登録しない。
+                // 場所は判定に使わない（クラスごとの既定の場所が最初から選択された状態になっており、
+                // 「場所も未選択」を条件にすると事実上スルーできなくなるため、教師の有無だけで判定する）
+                if (teacherId == null) {
+                    continue;
+                }
+
+                // 教師は決まっているのに場所が未定の場合は入力エラーにする
                 // （教師だけ決まって場所が未定、のような中途半端な状態でDBに保存させないため）
-                if (teacherId == null || roomId == null) {
-                    inputErrors.add(row.label() + "（" + classInfo.className() + "）：教師と場所の両方を選択してください");
+                if (roomId == null) {
+                    inputErrors.add(row.label() + "（" + classInfo.className() + "）：場所を選択してください");
                     inputErrorCells.add(cellKey);
                     continue;
                 }
@@ -335,25 +424,35 @@ public class ScheduleRegisterController {
 
         // 入力エラー（片方だけ選択、等）があれば、DB問い合わせをするまでもなく登録せずに画面へ戻す
         if (!inputErrors.isEmpty()) {
-            return renderWithErrors(model, weekValue, rows, classes, allParams, inputErrors, inputErrorCells);
+            return renderWithErrors(model, weekValue, view, isMakeup, rows, classes, allParams, inputErrors, inputErrorCells);
         }
 
         // 業務チェック＋登録（重複があれば全体が登録されない）
         // ここから先の判断はすべてScheduleRegisterServiceに任せる。
-        // 登録は「対象週×対象クラスの範囲を消して入れ直す」方式のため、
-        // 消す範囲を正しく指定できるよう、クラスID一覧と週の開始日・終了日も一緒に渡す
+        // 登録は「対象週×対象クラス×対象区分の範囲を消して入れ直す」方式のため、
+        // 消す範囲を正しく指定できるよう、クラスID一覧・区分一覧・週の開始日終了日を一緒に渡す
         List<Long> classIds = new ArrayList<>();
         for (ScheduleRegisterRepository.ClassInfo classInfo : classes) {
             classIds.add(classInfo.classId());
         }
 
+        // 通常画面(view=normal)は午前(1)・午後(2)、補講画面(view=makeup)は放課後(3)だけを
+        // 入れ替え対象にする。片方の画面から送信しても、もう片方の登録済みデータを消さないようにするため
+        List<Integer> checkNos;
+        if (isMakeup) {
+            checkNos = List.of(3);
+        } else {
+            checkNos = List.of(1, 2);
+        }
+
         String weekStart = monday.toString();
         String weekEnd = monday.plusDays(6).toString();
 
-        ScheduleRegisterService.RegisterResult result = scheduleService.registerWeek(entries, classIds, weekStart, weekEnd);
+        ScheduleRegisterService.RegisterResult result =
+                scheduleService.registerWeek(entries, classIds, checkNos, weekStart, weekEnd);
 
         if (!result.isSuccess()) {
-            return renderWithErrors(model, weekValue, rows, classes, allParams,
+            return renderWithErrors(model, weekValue, view, isMakeup, rows, classes, allParams,
                     result.getErrorMessages(), result.getConflictCells());
         }
 
@@ -361,6 +460,10 @@ public class ScheduleRegisterController {
         // （これをしないと、ブラウザの「再読み込み」で二重登録されてしまう可能性があるため。
         //   PRG（Post-Redirect-Get）パターンと呼ばれる定番のやり方）
         redirectAttributes.addAttribute("week", weekValue);
+        if (isMakeup) {
+            // view=normal（デフォルト）の時はURLに残さず、補講画面の時だけ付ける
+            redirectAttributes.addAttribute("view", "makeup");
+        }
         redirectAttributes.addFlashAttribute("successMessage", "スケジュールを登録しました");
         return "redirect:/schedule";
     }
@@ -371,6 +474,8 @@ public class ScheduleRegisterController {
     private String renderWithErrors(
             Model model,
             String weekValue,
+            String view,
+            boolean isMakeup,
             List<RowInfo> rows,
             List<ScheduleRegisterRepository.ClassInfo> classes,
             Map<String, String> allParams,
@@ -378,6 +483,8 @@ public class ScheduleRegisterController {
             Set<String> conflictCells
     ) {
         model.addAttribute("weekValue", weekValue);
+        model.addAttribute("view", view);
+        model.addAttribute("isMakeup", isMakeup);
         model.addAttribute("rows", rows);
         model.addAttribute("classes", classes);
         model.addAttribute("teachers", scheduleRepository.findActiveTeachers());

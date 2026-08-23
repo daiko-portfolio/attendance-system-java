@@ -35,6 +35,7 @@
     <select name="check_no" required>
         <option value="1" th:selected="${checkNo == '1'}">午前</option>
         <option value="2" th:selected="${checkNo == '2'}">午後</option>
+        <option value="3" th:selected="${checkNo == '3'}">補講</option>
     </select>
 
     <button type="submit" class="btn btn-search">表示</button>
@@ -78,8 +79,11 @@
               出欠登録画面（register.html）と同じ仕組みで、ラジオボタンのname属性を
               "attended_hours_生徒ID" という動的な名前にし、全員分を1フォームで送信する。
               こちらは登録済みデータの編集なので、保存されている出席時間をそのまま初期選択にする。
+
+              補講（区分=3）は1コマ1hのため、出席時間は「出席(1h)/欠席(0h)」の2択にする。
+              通常の午前午後は3hのコマなので、従来通り4択のまま。
             -->
-            <td>
+            <td th:if="${checkNo != '3'}">
                 <label class="radio-btn radio-present">
                     <input type="radio" th:name="${'attended_hours_' + row.personId}" value="3" th:checked="${row.attendedHours == 3}">
                     <span>全出席</span>
@@ -93,6 +97,18 @@
                 <label class="radio-btn radio-warning">
                     <input type="radio" th:name="${'attended_hours_' + row.personId}" value="1" th:checked="${row.attendedHours == 1}">
                     <span>1h</span>
+                </label>
+
+                <label class="radio-btn radio-absent">
+                    <input type="radio" th:name="${'attended_hours_' + row.personId}" value="0" th:checked="${row.attendedHours == 0}">
+                    <span>欠席</span>
+                </label>
+            </td>
+
+            <td th:if="${checkNo == '3'}">
+                <label class="radio-btn radio-present">
+                    <input type="radio" th:name="${'attended_hours_' + row.personId}" value="1" th:checked="${row.attendedHours == 1}">
+                    <span>出席</span>
                 </label>
 
                 <label class="radio-btn radio-absent">
