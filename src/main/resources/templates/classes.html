@@ -15,12 +15,17 @@
 
 <h1>教室管理</h1>
 
+<!-- 登録・更新の結果メッセージ（リダイレクト後に1回だけ表示される） -->
+<div class="success-box" th:if="${successMessage != null}" th:text="${successMessage}"></div>
+<div class="error-box" th:if="${errorMessage != null}" th:text="${errorMessage}"></div>
+
 <table>
     <tr>
         <th>ID</th>
         <th>教室名</th>
         <th>開始日</th>
         <th>終了日</th>
+        <th>必要時間（学科/実技）</th>
         <th>実施中</th>
         <th>更新</th>
     </tr>
@@ -43,6 +48,14 @@
 
             <td>
                 <input type="date" name="end_date" th:value="${row.endDate}">
+            </td>
+
+            <td>
+                <input type="number" name="required_academic_hours" min="0"
+                       th:value="${row.requiredAcademicHours}" style="width:70px">h
+                /
+                <input type="number" name="required_practical_hours" min="0"
+                       th:value="${row.requiredPracticalHours}" style="width:70px">h
             </td>
 
             <td>

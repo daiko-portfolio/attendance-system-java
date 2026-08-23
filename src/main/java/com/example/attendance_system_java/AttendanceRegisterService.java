@@ -8,6 +8,12 @@ import java.util.List;
  * 出欠登録画面の業務ロジック層。
  * 「出席時間から出席/欠席を判定する」という業務判断だけをここで行い、
  * DBへの実際の保存はAttendanceRegisterRepositoryに任せる。
+ *
+ * ■ Spring Boot初心者向けメモ（Service全般。他のServiceでも同じ）
+ * ・@Service は @Component の仲間で、「このクラスは業務ロジック担当ですよ」という目印。
+ *   役割を示すためのアノテーションで、動き自体は@Componentと同じ。
+ * ・Controller（画面の受付）→ Service（業務判断）→ Repository（DB操作）と分けるのが
+ *   Spring Bootの定番の構成で、Serviceは画面（HTTP）のことを知らないまま成立する。
  */
 @Service
 public class AttendanceRegisterService {

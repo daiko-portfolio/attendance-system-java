@@ -33,6 +33,18 @@ public class AttendanceSummaryController {
 
     public record ClassOption(long classId, String className) {}
 
+    /**
+     * コース全体の進捗（必要時間に対してどれだけ実施済みか）。
+     * 出欠一覧の期間絞り込みとは無関係に、そのクラスの全期間を通した累計で計算する
+     * （進捗は「開始日〜終了日」で見るものではなく、コース開始からの累計で見るものなので、
+     *  summary画面の期間フィルタ（startDate/endDate）はここでは使わない）。
+     */
+    public record CourseProgress(
+            int academicDone, int academicRequired, double academicRate,
+            int practicalDone, int practicalRequired, double practicalRate,
+            int totalDone, int totalRequired, double totalRate
+    ) {}
+
     private record RawSummary(
             int attendanceNo,
             String name,
@@ -53,8 +65,7 @@ public class AttendanceSummaryController {
     ) {
 
         /**
-         * 判定文字列（安全/注意/危険）からCSSクラス名を返す。
-         * 三項演算子ではなくif-elseで判定する。
+         * 判定文字列（安全/注意/危険）からCSSクラス名を返す（AttendanceListRepositoryのstatusClass()と同じ方針）。
          */
         public String judgeClass(String judge) {
             if (judge.equals("安全")) {
@@ -77,6 +88,100 @@ public class AttendanceSummaryController {
     // 小数点第1位で四捨五入する（例：66.66... → 66.7）
     private static double round1(double value) {
         return Math.round(value * 10) / 10.0;
+    }
+
+    /**
+     * コース進捗（必要時間に対する実施率）を組み立てる。
+     *
+     * 「実施済み時間」は生徒ごとの出席時間の合計ではなく、
+     * 「このクラスで出欠が記録されているコマ（日付×午前午後）の数 × 3h」で数える。
+     * 授業をやったかどうかが基準で、個々の生徒の出欠状況（休んだかどうか）は関係ない
+     * ため、COUNT(DISTINCT ...) でコマの重複を除いて数えている。
+     */
+    private CourseProgress buildCourseProgress(String classId) {
+        int requiredAcademicHours = 0;
+        int requiredPracticalHours = 0;
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement("""
+                     SELECT required_academic_hours, required_practical_hours
+                     FROM classes
+                     WHERE class_id = ?
+                     """)) {
+
+            stmt.setString(1, classId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    requiredAcademicHours = rs.getInt("required_academic_hours");
+                    requiredPracticalHours = rs.getInt("required_practical_hours");
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        int academicDone = 0;
+        int practicalDone = 0;
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement("""
+                     SELECT
+                         a.lesson_type,
+                         COUNT(DISTINCT a.attendance_date || '_' || a.check_no) AS slot_count
+                     FROM attendance a
+                     JOIN persons p ON a.person_id = p.person_id
+                     WHERE p.class_id = ?
+                     GROUP BY a.lesson_type
+                     """)) {
+
+            stmt.setString(1, classId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    String lessonType = rs.getString("lesson_type");
+                    int slotCount = rs.getInt("slot_count");
+
+                    if ("学科".equals(lessonType)) {
+                        academicDone = slotCount * 3;
+                    } else if ("実技".equals(lessonType)) {
+                        practicalDone = slotCount * 3;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        double academicRate;
+        if (requiredAcademicHours > 0) {
+            academicRate = (double) academicDone / requiredAcademicHours * 100;
+        } else {
+            academicRate = 0;
+        }
+
+        double practicalRate;
+        if (requiredPracticalHours > 0) {
+            practicalRate = (double) practicalDone / requiredPracticalHours * 100;
+        } else {
+            practicalRate = 0;
+        }
+
+        int totalDone = academicDone + practicalDone;
+        int totalRequired = requiredAcademicHours + requiredPracticalHours;
+
+        double totalRate;
+        if (totalRequired > 0) {
+            totalRate = (double) totalDone / totalRequired * 100;
+        } else {
+            totalRate = 0;
+        }
+
+        return new CourseProgress(
+                academicDone, requiredAcademicHours, round1(academicRate),
+                practicalDone, requiredPracticalHours, round1(practicalRate),
+                totalDone, totalRequired, round1(totalRate)
+        );
     }
 
     @GetMapping("/summary")
@@ -105,8 +210,11 @@ public class AttendanceSummaryController {
         }
 
         List<SummaryRow> rows = new ArrayList<>();
+        CourseProgress courseProgress = null;
 
         if (selectedClassId != null && !selectedClassId.isBlank()) {
+
+            courseProgress = buildCourseProgress(selectedClassId);
 
             // SUM(CASE WHEN 条件 THEN 値 ELSE 0 END) は「条件付き集計」というSQLの定番の書き方。
             // 例えば academic_attended_hours は「学科の行だけ出席時間を足し、それ以外の行は0を足す」
@@ -219,6 +327,7 @@ public class AttendanceSummaryController {
 
         model.addAttribute("classes", classes);
         model.addAttribute("rows", rows);
+        model.addAttribute("courseProgress", courseProgress);
         model.addAttribute("selectedClassId", selectedClassId);
         model.addAttribute("startDate", startDate);
         model.addAttribute("endDate", endDate);

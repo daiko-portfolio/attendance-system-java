@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 出欠編集・削除画面のDBアクセス層。生JDBCで書いている。
+ * 出欠編集・削除画面のDBアクセス層。生JDBCで書いている（AttendanceRegisterRepositoryと同じ方針）。
  */
 @Repository
 public class AttendanceEditRepository {
@@ -34,7 +34,7 @@ public class AttendanceEditRepository {
     ) {
 
         /**
-         * 出席時間に応じたCSSクラス名を返す（三項演算子ではなくif-elseで判定）。
+         * 出席時間に応じたCSSクラス名を返す（AttendanceListRepositoryのstatusClass()と同じ方針）。
          */
         public String statusClass() {
             if (attendedHours == null) {
@@ -105,8 +105,9 @@ public class AttendanceEditRepository {
 
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    // attended_hoursはNULLの可能性があるため、getInt()（NULLだと0になる）ではなく
+                    // attended_hoursはNULLの可能性がある。getInt()だとNULLが0になってしまうため、
                     // getObject()で受けてから型を確認して変換する
+                    // （NULL列の扱いはAttendanceListRepositoryのコメント参照）
                     Integer attendedHours = null;
                     Object rawHours = rs.getObject("attended_hours");
                     if (rawHours instanceof Number) {

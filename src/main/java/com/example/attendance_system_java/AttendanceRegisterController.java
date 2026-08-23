@@ -23,6 +23,25 @@ import java.util.Map;
  * ・「出席時間から出席/欠席を判定して保存する」という業務ロジックは
  *   AttendanceRegisterServiceに任せている。
  *
+ * ■ Spring Boot初心者向けメモ（Controller全般の基礎。他のControllerでも同じ）
+ * ・@Controller は「このクラスは画面を返すControllerですよ」という目印。
+ *   Spring起動時に自動でBean化され、対応するURLへのリクエストが来ると該当メソッドが呼ばれる。
+ * ・@GetMapping("/register") はFlaskの @app.route("/register") とほぼ同じ意味。
+ *   ブラウザが GET /register にアクセスした時にそのメソッドが呼ばれる。
+ *   @PostMapping はPOST（フォーム送信）を受け取るためのもの。
+ * ・@RequestParam は、URLのクエリパラメータやフォームの入力値を
+ *   メソッドの引数として受け取るためのアノテーション。
+ *   Flaskの request.args.get() / request.form.get() に相当する。
+ * ・Model は、Thymeleafのテンプレート（register.html）に値を渡すための入れ物。
+ *   model.addAttribute("名前", 値) で渡した値が、テンプレート内で ${名前} として使える。
+ *   Flaskの render_template("register.html", 名前=値) に相当する。
+ * ・戻り値の文字列 "register" は、テンプレート名（templates/register.html）を指す。
+ *   "redirect:/list" のように redirect: を付けると、そのURLへブラウザを
+ *   リダイレクトさせる（Flaskの redirect(url_for(...)) に相当）。
+ * ・RedirectAttributes はリダイレクト先に情報を渡すための仕組み。
+ *   addAttribute はURLのクエリパラメータとして付与され（?date=... の形で見える）、
+ *   addFlashAttribute は画面には見えない形で1回だけ値を渡せる。
+ *
  * SQLException（チェック例外）はAttendanceRegisterRepository側でキャッチしてRuntimeException（実行時例外）に
  * 変換しているため、このControllerはthrowsを書かずに済んでいる。
  * RuntimeExceptionは投げる場所を宣言する必要が無い例外の種類で、
@@ -117,9 +136,12 @@ public class AttendanceRegisterController {
     }
 
     /**
-     * 生徒1人1人につき "attended_hours_<person_id>" という名前のラジオボタンが
-     * 動的に並ぶ画面のため、@RequestParam Map<String, String> でフォームの中身を
-     * まるごと受け取り、名前のプレフィックス（前方一致）で目的のパラメータだけを拾い出している。
+     * @RequestParam Map<String, String> allParams と書くと、
+     * フォームから送られてきた「name属性 -> 入力値」の組をすべてまとめて受け取れる。
+     * 生徒1人1人につき "attended_hours_<person_id>" という名前のラジオボタンが動的に並び、
+     * 何人分来るか事前に決め打ちできないため、1つ1つ個別の引数として受け取るのではなく
+     * このMapでまとめて受け取り、名前のプレフィックス（前方一致）で目的のパラメータを拾い出している。
+     * この受け取り方は、出欠編集画面・スケジュール登録画面でも同じように使っている。
      */
     @PostMapping("/attendance/submit")
     public String submitAttendance(

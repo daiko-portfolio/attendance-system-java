@@ -15,6 +15,10 @@
 
 <h1>生徒管理</h1>
 
+<!-- 登録・更新の結果メッセージ（リダイレクト後に1回だけ表示される） -->
+<div class="success-box" th:if="${successMessage != null}" th:text="${successMessage}"></div>
+<div class="error-box" th:if="${errorMessage != null}" th:text="${errorMessage}"></div>
+
 <form action="/persons" method="get">
 
     教室：

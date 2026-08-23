@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.RequestParam;
  * メニュー画面（トップページ）のController。
  * このアプリで一番シンプルなControllerで、DB操作もなく
  * 単に templates/index.html を返すだけ。
- * @GetMapping("/") はFlaskの @app.route("/") に相当し、
- * ブラウザがトップページ（"/"）にアクセスした時にindex()が呼ばれる。
+ * サンプルデータ投入後だけ、完了メッセージを画面に出すための値を渡している。
+ * （アノテーションやModelの基礎はAttendanceRegisterControllerに書いてある）
  */
 @Controller
 public class IndexController {

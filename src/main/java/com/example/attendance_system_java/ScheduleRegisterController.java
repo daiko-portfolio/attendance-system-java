@@ -22,26 +22,9 @@ import java.util.Set;
  * HTTPパラメータの受け取り・画面用データの組み立てだけを行い、
  * 業務判断（重複チェックや登録可否）はScheduleRegisterServiceに任せる。
  *
- * ■ Spring Boot初心者向けメモ（Controller全般の基礎）
- * ・@Controller は「このクラスは画面を返すControllerですよ」という目印。
- *   Spring起動時に自動でBean化され、対応するURLへのリクエストが来ると
- *   該当メソッドが呼ばれる。
- * ・@GetMapping("/schedule") はFlaskの @app.route("/schedule") とほぼ同じ意味。
- *   ブラウザが GET /schedule にアクセスした時にそのメソッドが呼ばれる。
- *   @PostMapping はPOST（フォーム送信）を受け取るためのもの。
- * ・@RequestParam は、URLのクエリパラメータやフォームの入力値を
- *   メソッドの引数として受け取るためのアノテーション。
- *   Flaskの request.args.get() / request.form.get() に相当する。
- * ・Model は、Thymeleafのテンプレート（schedule.html）に値を渡すための入れ物。
- *   model.addAttribute("名前", 値) で渡した値が、テンプレート内で ${名前} として使える。
- *   Flaskの render_template("schedule.html", 名前=値) に相当する。
- * ・戻り値の文字列 "schedule" は、テンプレート名（templates/schedule.html）を指す。
- *   "redirect:/schedule" のように redirect: を付けると、そのURLへブラウザを
- *   リダイレクトさせる（Flaskの redirect(url_for(...)) に相当）。
- * ・RedirectAttributes はリダイレクト先に一時的な情報を渡すための仕組み。
- *   addAttribute はURLのクエリパラメータとして付与され（?week=... の形で見える）、
- *   addFlashAttribute は画面には見えない形で1回だけ値を渡せる
- *   （このクラスでは登録成功メッセージを渡すのに使っている）。
+ * 全Controllerの中で最も入力欄が多い画面で、
+ * 「クラス × 曜日 × 午前午後」の全セル分のフォーム項目を一度に受け取って処理する。
+ * （@Controller・@GetMapping・Modelといった基礎はAttendanceRegisterControllerに書いてある）
  */
 @Controller
 public class ScheduleRegisterController {
@@ -61,7 +44,7 @@ public class ScheduleRegisterController {
     public record RowInfo(int dayIndex, int checkNo, String dateStr, String label, boolean weekend) {
 
         /**
-         * 行の背景色を決めるCSSクラス名を返す（三項演算子ではなくif-elseで判定）。
+         * 行の背景色を決めるCSSクラス名を返す（AttendanceListRepositoryのstatusClass()と同じ方針）。
          * dayIndex==5が土曜、weekendがtrueで土曜でなければ日曜。
          */
         public String rowClass() {
@@ -277,11 +260,8 @@ public class ScheduleRegisterController {
     // ---- 登録処理 ----
 
     /**
-     * @RequestParam Map<String, String> allParams と書くと、
-     * フォームから送られてきた「name属性 -> 入力値」の組をすべてまとめて受け取れる。
-     * 今回は "status_1_0_1" のように、name属性がクラスID・曜日・午前午後の組み合わせで
-     * 動的に変化する（何個来るか事前に決め打ちできない）ため、
-     * 1つ1つ個別の引数として受け取るのではなく、このMapでまとめて受け取っている。
+     * "status_1_0_1"（クラスID_曜日_午前午後）のような動的な名前のパラメータを
+     * Mapでまとめて受け取る（受け取り方の詳しい説明はAttendanceRegisterControllerを参照）。
      */
     @PostMapping("/schedule/submit")
     public String submit(

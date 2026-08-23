@@ -30,7 +30,9 @@ public class ClassMasterRepository {
             String className,
             String startDate,
             String endDate,
-            boolean isActive
+            boolean isActive,
+            int requiredAcademicHours,
+            int requiredPracticalHours
     ) {}
 
     // 新教室作成フォームの、生徒1人分の入力（出席番号＋名前）
@@ -38,7 +40,8 @@ public class ClassMasterRepository {
 
     public List<ClassRow> findAll() {
         String sql = """
-                SELECT class_id, class_name, start_date, end_date, is_active
+                SELECT class_id, class_name, start_date, end_date, is_active,
+                       required_academic_hours, required_practical_hours
                 FROM classes
                 ORDER BY is_active DESC, end_date DESC, class_id ASC
                 """;
@@ -55,7 +58,9 @@ public class ClassMasterRepository {
                         rs.getString("class_name"),
                         rs.getString("start_date"),
                         rs.getString("end_date"),
-                        rs.getInt("is_active") != 0
+                        rs.getInt("is_active") != 0,
+                        rs.getInt("required_academic_hours"),
+                        rs.getInt("required_practical_hours")
                 ));
             }
         } catch (SQLException e) {
@@ -75,17 +80,24 @@ public class ClassMasterRepository {
             String className,
             String startDate,
             String endDate,
+            int requiredAcademicHours,
+            int requiredPracticalHours,
             List<StudentEntry> students
     ) {
         try (Connection conn = dataSource.getConnection()) {
 
             try (PreparedStatement stmt = conn.prepareStatement("""
-                    INSERT INTO classes (class_name, start_date, end_date, is_active)
-                    VALUES (?, ?, ?, 1)
+                    INSERT INTO classes (
+                        class_name, start_date, end_date, is_active,
+                        required_academic_hours, required_practical_hours
+                    )
+                    VALUES (?, ?, ?, 1, ?, ?)
                     """)) {
                 stmt.setString(1, className);
                 stmt.setString(2, startDate);
                 stmt.setString(3, endDate);
+                stmt.setInt(4, requiredAcademicHours);
+                stmt.setInt(5, requiredPracticalHours);
                 stmt.executeUpdate();
             }
 
@@ -113,10 +125,19 @@ public class ClassMasterRepository {
         }
     }
 
-    public void update(long classId, String className, String startDate, String endDate, int isActive) {
+    public void update(
+            long classId,
+            String className,
+            String startDate,
+            String endDate,
+            int isActive,
+            int requiredAcademicHours,
+            int requiredPracticalHours
+    ) {
         String sql = """
                 UPDATE classes
-                SET class_name = ?, start_date = ?, end_date = ?, is_active = ?
+                SET class_name = ?, start_date = ?, end_date = ?, is_active = ?,
+                    required_academic_hours = ?, required_practical_hours = ?
                 WHERE class_id = ?
                 """;
 
@@ -127,7 +148,9 @@ public class ClassMasterRepository {
             stmt.setString(2, startDate);
             stmt.setString(3, endDate);
             stmt.setInt(4, isActive);
-            stmt.setLong(5, classId);
+            stmt.setInt(5, requiredAcademicHours);
+            stmt.setInt(6, requiredPracticalHours);
+            stmt.setLong(7, classId);
             stmt.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException(e);

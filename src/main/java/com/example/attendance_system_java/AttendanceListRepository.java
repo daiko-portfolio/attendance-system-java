@@ -42,7 +42,13 @@ public class AttendanceListRepository {
 
         /**
          * 出席時間（午前・午後どちらにも使える）からCSSクラス名を返す。
-         * 三項演算子ではなくif-elseで判定する。
+         *
+         * 「色分けの条件分岐をJava側に置き、テンプレートは結果を参照するだけにする」という
+         * このプロジェクトの方針を最初に適用した箇所。
+         * Thymeleaf側に条件を書くと三項演算子の入れ子になって読みにくくなるため、
+         * ここで文字列を組み立てて、テンプレートでは ${row.statusClass(...)} と書くだけで済ませている。
+         * （月次出欠表・出席率サマリー・スケジュール画面にも同じ考え方の
+         *  statusClass()/judgeClass()/rowClass()/cellClass() を用意している）
          */
         public String statusClass(Integer hours) {
             if (hours == null) {
@@ -162,8 +168,11 @@ public class AttendanceListRepository {
                     String afternoonLessonType = rs.getString("afternoon_lesson_type");
 
                     // 午前・午後が未登録の場合、attended_hours列はNULLになりうる。
-                    // 生JDBCでNULLかどうかを調べるには、getInt()した直後にwasNull()を呼ぶ
+                    // 生JDBCのgetInt()はNULLを0として返してしまうため、
+                    // 「未登録(null)」と「0時間(欠席)」をそのままでは区別できない。
+                    // ここではgetInt()した直後にwasNull()を呼んで見分けている
                     // （C#のSqlDataReader.IsDBNull()に近い確認方法）。
+                    // 他のRepositoryでは、同じ目的でgetObject()の戻り値の型を見る書き方も使っている。
                     int morningHoursValue = rs.getInt("morning_hours");
                     Integer morningHours;
                     if (rs.wasNull()) {

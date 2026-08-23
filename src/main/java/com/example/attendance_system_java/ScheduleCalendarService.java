@@ -58,7 +58,8 @@ public class ScheduleCalendarService {
     ) {
 
         /**
-         * 日付セルに追加するCSSクラス名を返す（三項演算子ではなくif-elseで組み立てる）。
+         * 日付セルに追加するCSSクラス名を返す（AttendanceListRepositoryのstatusClass()と同じ方針）。
+         * ここだけは複数の状態が重なりうるので、該当するクラス名を連結して返す。
          */
         public String cellClass() {
             String result = "";

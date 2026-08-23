@@ -22,12 +22,6 @@ import java.util.Set;
  *   ・セルを空に戻して登録すれば、そのコマの登録を取り消せる
  * というシンプルな動きになる。入れ替えの途中で失敗した時に「消しただけ」の状態に
  * ならないよう、DELETEとINSERTはRepository側で1つのトランザクションとして実行される。
- *
- * ■ Spring Boot初心者向けメモ
- * ・@Service は @Component の仲間で、「このクラスは業務ロジック担当ですよ」という
- *   目印。役割を示すためのアノテーションで、動き自体は@Componentと同じ。
- *   Controller（画面の受付）→ Service（業務判断）→ Repository（DB操作）という
- *   3層に分けるのがSpring Bootの定番の構成。
  */
 @Service
 public class ScheduleRegisterService {

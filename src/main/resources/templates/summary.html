@@ -38,6 +38,39 @@
 
 <br>
 
+<!--
+  コース進捗（必要時間に対する実施率）。期間の絞り込み（開始日・終了日）とは無関係に、
+  そのクラスの開始からの累計で計算している（monthly.htmlのsummary-box/summary-cardを流用）。
+-->
+<div class="summary-box" th:if="${courseProgress != null}">
+    <h2>コース進捗</h2>
+
+    <div class="summary-grid">
+        <div class="summary-card">
+            <h3>総合</h3>
+            実施：<span th:text="${courseProgress.totalDone}"></span>h
+            / 必要：<span th:text="${courseProgress.totalRequired}"></span>h<br>
+            消化率：<span th:text="${courseProgress.totalRate}"></span>%
+        </div>
+
+        <div class="summary-card">
+            <h3>学科</h3>
+            実施：<span th:text="${courseProgress.academicDone}"></span>h
+            / 必要：<span th:text="${courseProgress.academicRequired}"></span>h<br>
+            消化率：<span th:text="${courseProgress.academicRate}"></span>%
+        </div>
+
+        <div class="summary-card">
+            <h3>実技</h3>
+            実施：<span th:text="${courseProgress.practicalDone}"></span>h
+            / 必要：<span th:text="${courseProgress.practicalRequired}"></span>h<br>
+            消化率：<span th:text="${courseProgress.practicalRate}"></span>%
+        </div>
+    </div>
+</div>
+
+<br>
+
 <table th:if="${!rows.isEmpty()}">
     <tr>
         <th>出席番号</th>

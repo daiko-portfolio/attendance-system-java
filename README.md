@@ -8,12 +8,12 @@
 
 ## できること
 
-- 教室・受講者の登録・管理
+- 教室・受講者・教師・部屋の登録・管理（登録/更新の結果はメッセージで表示。名前が空欄の場合は登録・更新せず理由を表示する）
 - 教室、日付、午前/午後ごとの出欠一括登録（登録済みデータがあれば選択状態を復元）
 - 出席時間の登録（3h / 2h / 1h / 0h）、授業属性の登録（学科/実技）
 - 出欠一覧の表示（日付・教室・名前で検索）
 - 月次出欠表の表示（学科/実技/総合の出席時間集計、6h=1日換算）
-- 出席率サマリー（学科/実技/総合ごとに安全/注意/危険を判定）
+- 出席率サマリー（学科/実技/総合ごとに安全/注意/危険を判定。コースの必要時間に対する消化率もあわせて表示）
 - 登録済み出欠の編集・削除
 - 授業スケジュール登録（週単位）
   - 縦軸：1週間×午前午後（14行）、横軸：クラス（コース）
@@ -89,7 +89,7 @@ DBアクセスは全画面とも生JDBC（`Connection`/`PreparedStatement`/`Resu
 層構成は画面の性質で使い分けています。
 
 - **3層(Controller/Service/Repository)**: `AttendanceRegister`/`AttendanceEdit`/`ScheduleRegister`/`ScheduleCalendar` — 出席/欠席の判定、重複チェックなど業務判断がある機能
-- **2層(Controller/Repository、Service省略)**: `AttendanceList`/マスタ管理4系統(`ClassMaster`/`PersonMaster`/`TeacherMaster`/`RoomMaster`) — 業務判断の無い単純なCRUD。「名前が空欄なら登録・更新しない」という入力チェックはServiceを作らずController内のガード文で行っている
+- **2層(Controller/Repository、Service省略)**: `AttendanceList`/マスタ管理4系統(`ClassMaster`/`PersonMaster`/`TeacherMaster`/`RoomMaster`) — 業務判断の無い単純なCRUD。「名前が空欄なら登録・更新しない」という入力チェックはServiceを作らずController内のガード文で行い、結果は`RedirectAttributes`のフラッシュ属性で画面にメッセージ表示している
 - **Controllerに直書き**: `AttendanceMonthly`/`AttendanceSummary` — DBの縦持ちデータを画面用に組み替える処理が複雑なため、層分けは今後の課題（[今後の追加予定](#今後の追加予定)参照）
 
 クラス名は「画面の機能＋役割」が分かるように、出欠まわりは`Attendance`、スケジュール登録は`ScheduleRegister`を頭に付けています（月次カレンダー閲覧の`ScheduleCalendar`と、週単位登録の`ScheduleRegister`を区別するため）。
@@ -115,7 +115,7 @@ attendance-system-java/
 │   └── images/                    … READMEのスクリーンショット・ER図
 ├── src/main/java/com/example/attendance_system_java/
 │   ├── AttendanceSystemJavaApplication.java
-│   ├── DatabaseInitializer.java   … 起動時にテーブル作成・初期データ投入
+│   ├── DatabaseInitializer.java   … 起動時にテーブルが無ければ作成
 │   ├── IndexController.java      … メニュー
 │   │
 │   │  （出欠まわり：Monthly/Summaryだけ層分け未対応）
@@ -175,11 +175,11 @@ SQLiteは外部キー制約が接続ごとにデフォルトOFFのため、`appl
 
 | テーブル | 内容 |
 |---|---|
-| `classes` | 教室/訓練クラス情報（`default_room_id`列でスケジュールの初期場所を保持） |
+| `classes` | 教室/訓練クラス情報（`default_room_id`列でスケジュールの初期場所を、`required_academic_hours`/`required_practical_hours`列でコースの必要時間を保持） |
 | `persons` | 受講者情報 |
 | `attendance` | 日付・午前午後・受講者ごとの出欠情報 |
-| `teachers` | 教師マスタ（起動時に初期データ投入） |
-| `rooms` | 使用場所マスタ（起動時に初期データ投入） |
+| `teachers` | 教師マスタ（`/teachers`画面から登録。起動直後は空） |
+| `rooms` | 使用場所マスタ（`/rooms`画面から登録。起動直後は空） |
 | `schedules` | 授業スケジュール（クラス・日付・午前午後ごとの教師・場所・属性・コメント） |
 
 `schedules` テーブルには排他制御のための3つのUNIQUE制約があります。

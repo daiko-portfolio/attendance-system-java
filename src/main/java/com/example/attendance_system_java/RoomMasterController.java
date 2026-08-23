@@ -5,13 +5,13 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.Map;
 
 /**
  * 部屋（使用場所）マスタ管理画面のController。
- * TeacherMasterControllerと同じ2層構成・同じ作りで、対象が部屋になっている。
- * 業務判断が無い単純なCRUDなので、Serviceを挟まずRoomMasterRepositoryを直接呼んでいる。
+ * TeacherMasterControllerと同じ作りで、対象が部屋になっている。
  */
 @Controller
 public class RoomMasterController {
@@ -29,18 +29,28 @@ public class RoomMasterController {
     }
 
     @PostMapping("/rooms/create")
-    public String create(@RequestParam("room_name") String roomName) {
+    public String create(
+            @RequestParam("room_name") String roomName,
+            RedirectAttributes redirectAttributes
+    ) {
         if (roomName == null || roomName.isBlank()) {
+            redirectAttributes.addFlashAttribute("errorMessage", "部屋名が空欄のため、追加していません。");
             return "redirect:/rooms";
         }
+
         roomRepository.insert(roomName.trim());
+        redirectAttributes.addFlashAttribute("successMessage", "部屋「" + roomName.trim() + "」を追加しました。");
         return "redirect:/rooms";
     }
 
     @PostMapping("/rooms/update")
-    public String update(@RequestParam Map<String, String> allParams) {
+    public String update(
+            @RequestParam Map<String, String> allParams,
+            RedirectAttributes redirectAttributes
+    ) {
         String roomName = allParams.get("room_name");
         if (roomName == null || roomName.isBlank()) {
+            redirectAttributes.addFlashAttribute("errorMessage", "部屋名が空欄のため、更新していません。");
             return "redirect:/rooms";
         }
 
@@ -54,6 +64,7 @@ public class RoomMasterController {
         }
 
         roomRepository.update(roomId, roomName.trim(), isActive);
+        redirectAttributes.addFlashAttribute("successMessage", "部屋「" + roomName.trim() + "」を更新しました。");
         return "redirect:/rooms";
     }
 }

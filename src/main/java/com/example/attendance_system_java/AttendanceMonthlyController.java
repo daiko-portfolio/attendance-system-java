@@ -82,10 +82,7 @@ public class AttendanceMonthlyController {
     public record Cell(String lessonType, Integer attendedHours) {
 
         /**
-         * セルの背景色を決めるCSSクラス名を返す。
-         * 三項演算子は使わず、Javaの規約どおりif-elseで書く
-         * （Thymeleaf側にこの判定を書くと三項演算子の入れ子になって読みにくいため、
-         *  ここで文字列を組み立てて、テンプレート側は参照するだけにしている）。
+         * セルの背景色を決めるCSSクラス名を返す（AttendanceListRepositoryのstatusClass()と同じ方針）。
          */
         public String statusClass() {
             if (attendedHours == null) {
@@ -210,8 +207,7 @@ public class AttendanceMonthlyController {
 
                 try (ResultSet rs = stmt.executeQuery()) {
                     while (rs.next()) {
-                        // attended_hoursはNULLの可能性があるため、getInt()（NULLだと0になる）ではなく
-                        // getObject()で受けてから型を確認して変換する
+                        // attended_hoursのNULL対策（AttendanceEditRepositoryと同じ）
                         Integer attendedHours = null;
                         Object rawHours = rs.getObject("attended_hours");
                         if (rawHours instanceof Number) {

@@ -425,3 +425,20 @@ input[type="checkbox"]:focus {
     margin-top: 0;
     margin-bottom: 8px;
 }
+
+/* 登録・更新の結果メッセージ（スケジュール登録画面とマスタ管理画面で共通） */
+.success-box {
+    border: 1px solid #4cae4c;
+    background-color: #e9f7e9;
+    color: #2d7a2d;
+    padding: 10px;
+    margin: 10px 0;
+}
+
+.error-box {
+    border: 1px solid #d9534f;
+    background-color: #fdecea;
+    color: #b52b27;
+    padding: 10px;
+    margin: 10px 0;
+}

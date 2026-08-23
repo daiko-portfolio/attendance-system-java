@@ -14,8 +14,8 @@ import java.util.Map;
 
 /**
  * 出欠編集・削除画面のController。
- * AttendanceRegisterControllerと同様、"attended_hours_<person_id>" という
- * 動的な名前のパラメータをMapでまとめて受け取って処理する構成。
+ * 出欠登録画面（AttendanceRegisterController）とほぼ同じ作りで、
+ * 登録済みデータの修正・削除を担当する。
  *
  * 一覧表示・削除は業務判断が無いのでAttendanceEditRepositoryを直接呼び、
  * 「出席/欠席の判定」という業務判断があるまとめ更新だけAttendanceEditServiceに任せている。
@@ -82,10 +82,8 @@ public class AttendanceEditController {
     }
 
     /**
-     * @RequestParam Map<String, String> allParams と書くと、
-     * フォームから送られてきた「name属性 -> 入力値」の組をすべてまとめて受け取れる。
-     * 今回は "attended_hours_<person_id>" のように、name属性が生徒IDの組み合わせで
-     * 動的に変化する（何人分来るか事前に決め打ちできない）ため、このMapでまとめて受け取っている。
+     * "attended_hours_<person_id>" という動的な名前のパラメータをMapでまとめて受け取る
+     * （受け取り方の詳しい説明はAttendanceRegisterControllerを参照）。
      */
     @PostMapping("/attendance/update")
     public String update(

@@ -14,9 +14,13 @@ INSERT INTO teachers (teacher_id, teacher_name, is_active) VALUES (1, '田中', 
 INSERT INTO teachers (teacher_id, teacher_name, is_active) VALUES (2, '田代', 1);
 INSERT INTO teachers (teacher_id, teacher_name, is_active) VALUES (3, '多田', 1);
 INSERT INTO teachers (teacher_id, teacher_name, is_active) VALUES (4, '田所', 1);
-INSERT INTO classes (class_id, class_name, start_date, end_date, is_active, default_room_id) VALUES (1, 'Aクラス', '2026-04-01', '2027-03-31', 1, 2);
-INSERT INTO classes (class_id, class_name, start_date, end_date, is_active, default_room_id) VALUES (2, 'Bクラス', '2026-04-01', '2027-03-31', 1, 1);
-INSERT INTO classes (class_id, class_name, start_date, end_date, is_active, default_room_id) VALUES (3, 'Cクラス', '2026-04-01', '2027-03-31', 1, 3);
+-- Aクラスは1年コース、B・Cクラスは半年コースという想定のデモデータ。
+-- 必要時間は「1日6h・平日のみ」を目安にした概算値（学科:実技はおおよそ4:6の比率）。
+-- 半年コース(B/C)はちょうど1年コース(A)の半分の必要時間にしてあり、
+-- 出席率サマリー画面の消化率の見え方を比較しやすくしている。
+INSERT INTO classes (class_id, class_name, start_date, end_date, is_active, default_room_id, required_academic_hours, required_practical_hours) VALUES (1, 'Aクラス', '2026-04-01', '2027-03-31', 1, 2, 480, 720);
+INSERT INTO classes (class_id, class_name, start_date, end_date, is_active, default_room_id, required_academic_hours, required_practical_hours) VALUES (2, 'Bクラス', '2026-04-01', '2026-09-30', 1, 1, 240, 360);
+INSERT INTO classes (class_id, class_name, start_date, end_date, is_active, default_room_id, required_academic_hours, required_practical_hours) VALUES (3, 'Cクラス', '2026-04-01', '2026-09-30', 1, 3, 240, 360);
 INSERT INTO persons (person_id, attendance_no, name, class_id, is_active) VALUES (1, 1, '吉田', 1, 1);
 INSERT INTO persons (person_id, attendance_no, name, class_id, is_active) VALUES (2, 2, '山田', 1, 1);
 INSERT INTO persons (person_id, attendance_no, name, class_id, is_active) VALUES (3, 3, '佐々木', 1, 1);

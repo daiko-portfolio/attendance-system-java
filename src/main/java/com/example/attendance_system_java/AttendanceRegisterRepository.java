@@ -13,10 +13,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 出欠登録画面のDBアクセス層。
- * このRepositoryだけ、他画面と違って「生JDBC」（Connection/PreparedStatement/ResultSetを
- * 自分で開いて閉じる書き方）で書いている。JdbcTemplateが裏で自動でやってくれていた
- * 「接続を開く→SQL実行→接続を閉じる」という流れを、ここでは全部自分の目で見える形にしている。
+ * 出欠登録画面のDBアクセス層。最初に「生JDBC」で書いたRepositoryで、
+ * 以降のRepositoryも全て同じ書き方に揃えている（このファイルが書き方の見本になる）。
+ * 生JDBCとは、Connection/PreparedStatement/ResultSetを自分で開いて閉じる書き方のこと。
+ * JdbcTemplateが裏で自動でやってくれる「接続を開く→SQL実行→接続を閉じる」という流れを、
+ * ここでは全部自分の目で見える形にしている。
  *
  * ■ C#（ADO.NET）との対応
  *   SqlConnection   -> java.sql.Connection
@@ -47,6 +48,12 @@ public class AttendanceRegisterRepository {
     public AttendanceRegisterRepository(DataSource dataSource) {
         this.dataSource = dataSource;
     }
+
+    // ---- データの入れ物 ----
+    // record は「フィールドとgetterだけを持つ、変更不可のデータの入れ物」を
+    // 1行で定義できるJavaの機能。例えば ClassOption なら、自動で
+    // classId()/className() というgetterメソッドが使えるようになる。
+    // 画面に渡すデータの形はRepositoryごとにrecordで定義している（他のRepositoryも同じ）。
 
     public record ClassOption(long classId, String className) {}
 

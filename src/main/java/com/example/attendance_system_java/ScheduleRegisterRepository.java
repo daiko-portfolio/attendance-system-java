@@ -11,17 +11,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * スケジュール機能のDBアクセス層。生JDBC（Connection/PreparedStatement/ResultSet）で書いている。
+ * スケジュール機能のDBアクセス層。生JDBCで書いている（書き方の詳細はAttendanceRegisterRepository参照）。
  * SQLはすべてここに集約する。Service層は業務判断だけを行う。
  *
- * ■ C#（ADO.NET）との対応
- *   SqlConnection   -> java.sql.Connection
- *   SqlCommand      -> java.sql.PreparedStatement
- *   SqlDataReader   -> java.sql.ResultSet
- *   接続文字列      -> DataSource（Spring Bootが自動で用意するBean）
- *
- * SQLExceptionはこのRepository内でキャッチしてRuntimeExceptionに変換し、
- * 呼び出し元（Service/Controller）にthrowsを伝播させない。
+ * このプロジェクトで唯一、JDBCのトランザクション（setAutoCommit/commit/rollback）を
+ * 明示的に使っているRepository。詳細はreplaceWeekSchedules()のコメントを参照。
  */
 @Repository
 public class ScheduleRegisterRepository {
@@ -33,9 +27,6 @@ public class ScheduleRegisterRepository {
     }
 
     // ---- データの入れ物 ----
-    // record は「フィールドとgetterだけを持つ、変更不可のデータの入れ物」を
-    // 1行で定義できるJavaの機能。例えば ClassInfo なら、自動で
-    // classId()/className()/defaultRoomId() というgetterメソッドが使えるようになる。
 
     public record ClassInfo(long classId, String className, Long defaultRoomId) {}
 
@@ -74,9 +65,9 @@ public class ScheduleRegisterRepository {
                 long classId = rs.getLong("class_id");
                 String className = rs.getString("class_name");
 
-                // SQLiteドライバはINTEGER列の値をInteger/Long/nullのいずれかで返すことがあるため、
-                // getLong()で直接受けずにObjectとして受け取ってから型を確認して変換している。
-                // （default_room_idは空（NULL）の場合があるため、getLong()だと0扱いになってしまい困る）
+                // default_room_idは未設定（NULL）の場合があり、getLong()だと0扱いになってしまう。
+                // さらにSQLiteドライバはINTEGER列をInteger/Longどちらで返すか決まっていないため、
+                // Objectで受けてからNumberに揃えて変換している
                 Long defaultRoomId = null;
                 Object raw = rs.getObject("default_room_id");
                 if (raw instanceof Number) {

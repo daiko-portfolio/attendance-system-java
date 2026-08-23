@@ -4,13 +4,16 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-import java.util.Map;
-
 /**
  * 起動時にテーブルが無ければ作る処理。
  * Flask版 app.py の init_db() に相当する。
  * CREATE TABLE IF NOT EXISTS なので既にテーブルがあれば何もしない。
+ *
+ * DBファイル（data/attendance.db）はGit管理外で、起動のたびに無ければ自動生成される
+ * 使い捨てのファイルなので、既存データを保持したままの列追加（ALTER TABLE ADD COLUMN）は
+ * 行わず、列は最初からすべてCREATE TABLEに書いている
+ * （列を後から書き足す場合は、この`data`フォルダごと削除してから起動し直せば、
+ *  この最新のCREATE TABLE定義で作り直される）。
  *
  * ■ Spring Boot初心者向けメモ
  * ・@Component を付けたクラスは、アプリ起動時にSpringが自動でインスタンス化して管理してくれる
@@ -56,6 +59,9 @@ public class DatabaseInitializer implements CommandLineRunner {
                 """);
 
         // 教室/訓練クラス
+        // default_room_id はスケジュール登録画面での初期の場所の提案に使う。
+        // required_academic_hours / required_practical_hours はコースの必要時間（学科/実技）で、
+        // 出席率サマリー画面の消化率（分母）に使う。
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS classes (
                     class_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,6 +70,8 @@ public class DatabaseInitializer implements CommandLineRunner {
                     end_date TEXT,
                     is_active INTEGER NOT NULL DEFAULT 1,
                     default_room_id INTEGER,
+                    required_academic_hours INTEGER NOT NULL DEFAULT 0,
+                    required_practical_hours INTEGER NOT NULL DEFAULT 0,
                     FOREIGN KEY(default_room_id) REFERENCES rooms(room_id)
                 )
                 """);
@@ -135,52 +143,9 @@ public class DatabaseInitializer implements CommandLineRunner {
                 ON schedules(schedule_date, check_no)
                 """);
 
-        // classes に default_room_id 列が無ければ追加する
-        // SQLiteのALTER TABLEはADD COLUMNをサポートしている
-        // （古いDBファイルに対して、後から列を1つ増やす操作。既存データは消えない）
-        if (!columnExists("classes", "default_room_id")) {
-            jdbcTemplate.execute("ALTER TABLE classes ADD COLUMN default_room_id INTEGER");
-        }
-
-        // 既にschedulesが作られていてmemo列が無い場合に備えて追加する
-        if (!columnExists("schedules", "memo")) {
-            jdbcTemplate.execute("ALTER TABLE schedules ADD COLUMN memo TEXT");
-        }
-
-        // 教師・場所マスタの編集画面はまだ無いため、
-        // テーブルが空の時だけ初期データを入れておく
-        Integer teacherCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM teachers", Integer.class);
-        if (teacherCount != null && teacherCount == 0) {
-            jdbcTemplate.update("INSERT INTO teachers (teacher_name) VALUES (?)", "田中");
-            jdbcTemplate.update("INSERT INTO teachers (teacher_name) VALUES (?)", "田代");
-            jdbcTemplate.update("INSERT INTO teachers (teacher_name) VALUES (?)", "多田");
-        }
-
-        Integer roomCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM rooms", Integer.class);
-        if (roomCount != null && roomCount == 0) {
-            jdbcTemplate.update("INSERT INTO rooms (room_name) VALUES (?)", "2F教室");
-            jdbcTemplate.update("INSERT INTO rooms (room_name) VALUES (?)", "1F教室");
-            jdbcTemplate.update("INSERT INTO rooms (room_name) VALUES (?)", "外部A教室");
-        }
-    }
-
-    /**
-     * 指定テーブルに指定列が存在するかをPRAGMAで確認する。
-     * PRAGMA table_info(テーブル名) はSQLite独自のSQLで、
-     * そのテーブルの列一覧（列名・型など）を返してくれる。
-     * jdbcTemplate.queryForList(...) は、結果の各行を
-     * 「列名 -> 値」のMapとして受け取れる、JdbcTemplateの汎用メソッド。
-     * RowMapperを自分で書くまでもない単純な取得の時によく使う。
-     */
-    private boolean columnExists(String tableName, String columnName) {
-        List<Map<String, Object>> columns = jdbcTemplate.queryForList("PRAGMA table_info(" + tableName + ")");
-
-        for (Map<String, Object> column : columns) {
-            Object name = column.get("name");
-            if (name != null && name.toString().equals(columnName)) {
-                return true;
-            }
-        }
-        return false;
+        // 教師・場所・教室・生徒のデータは、それぞれのマスタ管理画面（/teachers, /rooms, /classes, /persons）
+        // から登録できるため、ここでの初期データ投入は行わない。
+        // 動作確認用のまとまったデータが欲しい場合は、メニュー画面の「サンプルデータ投入」ボタンを使う
+        // （SampleDataService が sample_data.sql の内容を全テーブルへ投入する）。
     }
 }
